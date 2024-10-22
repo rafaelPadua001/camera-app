@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import '../Layout/RemoveDialog.dart';
 import '../Layout/EditDialog.dart';
+import '../Layout/GaleryCarousel.dart';
 
 class Galery extends StatefulWidget {
   @override
@@ -13,7 +14,7 @@ class Galery extends StatefulWidget {
 
 class _GaleryState extends State<Galery> {
   List<File> _images = []; // Lista para armazenar as imagens capturadas
-  ui.Image? processedImage; 
+  ui.Image? processedImage;
 
   @override
   void initState() {
@@ -64,6 +65,16 @@ class _GaleryState extends State<Galery> {
                     onLongPress: () {
                       _showOptionsMenu(context, index);
                     },
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GaleryCarousel(
+                            images: _images,
+                            initialIndex: index),
+                          ),
+                        );
+                    },
                     child: Image.file(
                       _images[index],
                       fit: BoxFit.cover,
@@ -95,7 +106,8 @@ class _GaleryState extends State<Galery> {
                 title: Text('Edit'),
                 onTap: () {
                   Navigator.pop(context); // Fecha o menu
-                  _showEditDialog(context, _images[index], processedImage, index);
+                  _showEditDialog(
+                      context, _images[index], processedImage, index);
                   // Adicione a funcionalidade de mostrar informações sobre a imagem aqui
                 },
               ),
@@ -122,19 +134,23 @@ class _GaleryState extends State<Galery> {
     );
   }
 
-void _showEditDialog(
-    BuildContext context, File image, ui.Image? processedImage, int index) {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return EditDialog(
-        image: image,
-        processedImage: processedImage, // Passa a imagem processada aqui
-      );
-    },
-  );
-}
-
+  void _showEditDialog(
+      BuildContext context, File image, ui.Image? processedImage, int index) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return EditDialog(
+          image: image,
+          processedImage: processedImage, // Passa a imagem processada aqui
+        );
+      },
+    ).then((result) {
+      if (result == true) {
+        // Se o resultado do diálogo foi true, recarrega as imagens
+        _loadImages();
+      }
+    });
+  }
 
   void _showRemoveDialog(BuildContext context, File image, int index) {
     showDialog(
