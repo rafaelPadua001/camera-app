@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'EditCarouselOptions.dart';
+import 'package:path_provider/path_provider.dart';
 
 class EditDialog extends StatefulWidget {
   final File image; // Imagem original
@@ -43,6 +44,24 @@ class _EditDialogState extends State<EditDialog> {
     }
   }
 
+  Future<void> _saveImageToCache(Uint8List imageBytes) async {
+    try {
+      // Obtém o diretório temporário (cache) do dispositivo
+      final directory = await getTemporaryDirectory();
+      // Define o caminho completo onde a imagem será salva
+      final imagePath = '${directory.path}/processed_image.png';
+      // Cria o arquivo e escreve os bytes da imagem
+      final file = File(imagePath);
+      await file.writeAsBytes(imageBytes);
+
+      // Exibe uma mensagem de sucesso
+      print('Imagem salva em: $imagePath');
+    } catch (e) {
+      // Lida com erros de salvamento
+      print('Erro ao salvar a imagem: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -53,16 +72,17 @@ class _EditDialogState extends State<EditDialog> {
         height: MediaQuery.of(context).size.height,
         padding: EdgeInsets.all(10),
         decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.blue.withOpacity(0.0), // Cor inicial do gradiente
-            Colors.purple.withOpacity(0.3), // Cor final do gradiente
-          ],
-          begin: Alignment.topLeft, // Direção do gradiente
-          end: Alignment.bottomRight,
+          gradient: LinearGradient(
+            colors: [
+              Colors.black.withOpacity(0.7), // Cor inicial do gradiente
+              Colors.grey.withOpacity(0.1), // Cor final do gradiente
+            ],
+            begin: Alignment.topLeft, // Direção do gradiente
+            end: Alignment.bottomRight,
+          ),
+          borderRadius:
+              BorderRadius.circular(20), // Borda arredondada, se desejado
         ),
-        borderRadius: BorderRadius.circular(20), // Borda arredondada, se desejado
-      ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -159,8 +179,19 @@ class _EditDialogState extends State<EditDialog> {
                     ),
                     SizedBox(width: 8), // Espaçamento entre os botões
                     TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
+                      onPressed: () async {
+                        if (processedImageBytes != null) {
+                          await _saveImageToCache(
+                              processedImageBytes!); // Salva a imagem processada
+                          Navigator.pop(context, true);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content:
+                                  Text('Nenhuma imagem processada disponível.'),
+                            ),
+                          );
+                        }
                       },
                       child: const Text('Save'),
                     ),
