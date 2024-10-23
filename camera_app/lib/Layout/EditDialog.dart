@@ -48,8 +48,11 @@ class _EditDialogState extends State<EditDialog> {
     try {
       // Obtém o diretório temporário (cache) do dispositivo
       final directory = await getTemporaryDirectory();
-      // Define o caminho completo onde a imagem será salva
-      final imagePath = '${directory.path}/processed_image.png';
+      
+      // Gera um nome único baseado no timestamp atual
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final imagePath = '${directory.path}/image_${timestamp}.png';
+      
       // Cria o arquivo e escreve os bytes da imagem
       final file = File(imagePath);
       await file.writeAsBytes(imageBytes);
