@@ -70,10 +70,9 @@ class _GaleryState extends State<Galery> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => GaleryCarousel(
-                            images: _images,
-                            initialIndex: index),
-                          ),
-                        );
+                              images: _images, initialIndex: index),
+                        ),
+                      );
                     },
                     child: Image.file(
                       _images[index],
@@ -97,7 +96,37 @@ class _GaleryState extends State<Galery> {
                 leading: Icon(Icons.share),
                 title: Text('Share'),
                 onTap: () {
-                  Navigator.pop(context); // Fecha o menu
+                  Navigator.pop(context);
+                  showModalBottomSheet(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return Container(
+                          height: 200,
+                          child: Column(
+                            children: <Widget>[
+                              ListTile(
+                                leading: Icon(Icons.link),
+                                title: Text('Copy link'),
+                                onTap: () {
+                                  // Adicione a funcionalidade de copiar o link
+                                  Navigator.pop(
+                                      context); // Fecha o BottomSheet de compartilhamento
+                                },
+                              ),
+                              ListTile(
+                                leading: Icon(Icons.send),
+                                title: Text('Send'),
+                                onTap: () {
+                                  // Adicione a funcionalidade de envio
+                                  Navigator.pop(
+                                      context); // Fecha o BottomSheet de compartilhamento
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      });
+                   // Fecha o menu
                   // Adicione a funcionalidade de compartilhamento aqui
                 },
               ),
