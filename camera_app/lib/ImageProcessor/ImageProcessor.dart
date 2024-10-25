@@ -13,25 +13,26 @@ class ImageProcessor {
   ImageProcessor(this.originalImagePath, this.selectedHairImagePath);
 
   Future<Uint8List> processImages() async {
-    // Carregar as imagens originais
-    final originalImageBytes = await _loadImageBytes(originalImagePath);
-    final selectedHairImageBytes = await _loadImageBytes(selectedHairImagePath);
+    // Remover cabelo da imagem original
+    final imageWithoutHair = await removeHair();
 
-    // Decodificar as imagens
-    img.Image originalImage = img.decodeImage(originalImageBytes)!;
+    // Decodificar a imagem sem cabelo
+    img.Image originalImage = img.decodeImage(imageWithoutHair)!;
+
+    // Carregar a imagem de cabelo selecionada
+    final selectedHairImageBytes = await _loadImageBytes(selectedHairImagePath);
     img.Image selectedHairImage = img.decodeImage(selectedHairImageBytes)!;
 
     // Criar as opções para o detector de rosto
     final FaceDetectorOptions options = FaceDetectorOptions(
-      enableContours: true, // Por exemplo, habilitar contornos se necessário
-      enableClassification: true, // Ativar classificação de rosto se necessário
-      // Adicione outras opções conforme necessário
+      enableContours: true,
+      enableClassification: true,
     );
 
     // Criar o detector de rosto com as opções
     final FaceDetector faceDetector = FaceDetector(options: options);
 
-    // Detectar o rosto na imagem
+    // Detectar o rosto na imagem original
     final faces = await faceDetector.processImage(InputImage.fromFilePath(originalImagePath));
 
     if (faces.isEmpty) {
@@ -44,20 +45,20 @@ class ImageProcessor {
     double faceWidth = _calculateFaceWidth(face);
     double faceHeight = face.boundingBox.height.toDouble();
 
-    // Calcular o fator de redimensionamento do cabelo com base nas proporções do rosto
+    // Calcular o fator de redimensionamento do cabelo
     double hairWidthFactor = faceWidth / selectedHairImage.width;
-    double hairHeightFactor = faceHeight / selectedHairImage.height; // Ajuste para a altura da testa
+    double hairHeightFactor = faceHeight / selectedHairImage.height;
 
     // Redimensionar a imagem do cabelo
     img.Image resizedHairImage = img.copyResize(
       selectedHairImage,
-      width: (selectedHairImage.width * hairWidthFactor * 1.1).toInt(), // Aumento de 1%
+      width: (selectedHairImage.width * hairWidthFactor * 1.0).toInt(),
       height: (selectedHairImage.height * hairHeightFactor).toInt(),
     );
 
     // Calcular a posição do cabelo na imagem original
     int hairX = (face.boundingBox.left + (faceWidth / 2) - (resizedHairImage.width / 2)).toInt();
-    int hairY = (face.boundingBox.top * 0.52).toInt(); // Ajustar para que o cabelo fique acima do rosto
+    int hairY = (face.boundingBox.top * 0.54).toInt(); // Ajuste para que o cabelo fique acima do rosto
 
     // Desenhar o cabelo na imagem original
     img.drawImage(originalImage, resizedHairImage, dstX: hairX, dstY: hairY);
@@ -83,20 +84,15 @@ class ImageProcessor {
   Future<Face?> _detectFace(Uint8List imageBytes) async {
     final inputImage = InputImage.fromFilePath(originalImagePath);
 
-    // Configurar o detector de rosto
     final options = FaceDetectorOptions(
-      performanceMode: FaceDetectorMode.accurate, // Alta precisão
-      enableLandmarks: true, // Detectar marcos faciais
+      performanceMode: FaceDetectorMode.accurate,
+      enableLandmarks: true,
     );
     final faceDetector = FaceDetector(options: options);
 
-    // Detectar rostos na imagem
     final List<Face> faces = await faceDetector.processImage(inputImage);
-
-    // Fechar o detector de rosto
     faceDetector.close();
 
-    // Retornar o primeiro rosto detectado, se houver
     if (faces.isNotEmpty) {
       return faces.first;
     }
@@ -104,37 +100,101 @@ class ImageProcessor {
   }
 
   double _calculateFaceWidth(Face face) {
-    // Verifica se os olhos ou orelhas estão presentes
     final Point<int>? leftEye = face.landmarks[FaceLandmarkType.leftEye]?.position;
     final Point<int>? rightEye = face.landmarks[FaceLandmarkType.rightEye]?.position;
     final Point<int>? leftEar = face.landmarks[FaceLandmarkType.leftEar]?.position;
     final Point<int>? rightEar = face.landmarks[FaceLandmarkType.rightEar]?.position;
 
-    // Converte o canto superior esquerdo da bounding box de Offset para Point<int>
     final Point<int> topOfHead = Point<int>(
       face.boundingBox.topLeft.dx.round(),
       face.boundingBox.topLeft.dy.round(),
     );
 
     if (leftEye != null && rightEye != null) {
-      // Usar a distância entre os olhos como referência para a largura do rosto
       double eyeDistance = (rightEye.x.toDouble() - leftEye.x.toDouble()).abs();
-
-      // Calcular a altura do rosto (da parte superior da cabeça até o queixo)
       double faceHeight = (face.boundingBox.bottomRight.dy - topOfHead.y.toDouble()).abs();
+      double refinedWidth = eyeDistance * 1.8;
+      double margin = faceHeight * 0.3;
 
-      // Proporção refinada
-      double refinedWidth = eyeDistance * 1.7; // Aumentar a proporção
-      double margin = faceHeight * 0.2; // Aumentar a margem baseada na altura do rosto
-
-      return refinedWidth + margin; // Largura refinada com margem
+      return refinedWidth + margin;
     } else if (leftEar != null && rightEar != null) {
-      // Usar a distância entre as orelhas para calcular a largura
       double earDistance = (rightEar.x.toDouble() - leftEar.x.toDouble()).abs();
-      return earDistance + (earDistance * 0.3); // Aumentar a margem ao usar as orelhas
+      return earDistance + (earDistance * 0.4);
     } else {
-      // Se os marcos faciais não estiverem disponíveis, usar o bounding box
       return face.boundingBox.width.toDouble();
     }
+  }
+
+  Future<Uint8List> removeHair() async {
+    // Carregar a imagem original
+  final originalImageBytes = await _loadImageBytes(originalImagePath);
+  img.Image originalImage = img.decodeImage(originalImageBytes)!;
+
+  // Configurar as opções do detector de rosto
+  final FaceDetectorOptions options = FaceDetectorOptions(
+    enableContours: true, // Habilitar contornos para detecção detalhada
+    enableClassification: true, // Habilitar classificação
+  );
+
+  // Criar o detector de rosto
+  final FaceDetector faceDetector = FaceDetector(options: options);
+
+  // Detectar o rosto na imagem
+  final faces = await faceDetector.processImage(InputImage.fromFilePath(originalImagePath));
+
+  if (faces.isEmpty) {
+    throw Exception('Nenhum rosto detectado.');
+  }
+
+  Face face = faces.first;
+
+  // Estimar a posição e tamanho do cabelo com base na posição do rosto
+  double faceWidth = _calculateFaceWidth(face);
+  int hairTopY = (face.boundingBox.top - face.boundingBox.height * 0.3).toInt(); // Acima da testa
+  int hairBottomY = face.boundingBox.top.toInt(); // Testa
+
+  // Substituir o cabelo com uma região suavizada em vez de um retângulo sólido
+  for (int y = hairTopY; y < hairBottomY; y++) {
+    for (int x = face.boundingBox.left.toInt(); x < face.boundingBox.right.toInt(); x++) {
+      // Aplicar uma técnica de blur para suavizar a área do cabelo
+      originalImage = _applyBlurToArea(originalImage, x, y);
+    }
+  }
+
+  // Retornar a imagem final suavizada
+  return Uint8List.fromList(img.encodePng(originalImage));
+}
+
+img.Image _applyBlurToArea(img.Image image, int x, int y) {
+  // Definir a intensidade do blur
+  const int blurRadius = 5;
+  
+  int r = 0, g = 0, b = 0, count = 0;
+
+  // Aplicar blur gaussiano ao redor da área selecionada
+  for (int i = -blurRadius; i <= blurRadius; i++) {
+    for (int j = -blurRadius; j <= blurRadius; j++) {
+      int newX = x + i;
+      int newY = y + j;
+
+      if (newX >= 0 && newX < image.width && newY >= 0 && newY < image.height) {
+        int pixelColor = image.getPixel(newX, newY);
+        r += img.getRed(pixelColor);
+        g += img.getGreen(pixelColor);
+        b += img.getBlue(pixelColor);
+        count++;
+      }
+    }
+  }
+
+  // Calcular a média das cores ao redor
+  r = (r / count).toInt();
+  g = (g / count).toInt();
+  b = (b / count).toInt();
+
+  // Substituir o pixel na posição atual pela cor média
+  image.setPixel(x, y, img.getColor(r, g, b));
+
+  return image;
   }
 }
