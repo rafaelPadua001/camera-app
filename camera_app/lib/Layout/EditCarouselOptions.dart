@@ -2,18 +2,19 @@ import 'package:camera_app/ImageProcessor/ImageProcessor.dart';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'dart:ui' as ui;
-import 'dart:typed_data'; // Import necessário para o Uint8List
+import 'dart:typed_data';
 
 class EditCarouselOptions extends StatefulWidget {
   final List<String> imagePaths;
   final String originalImagePath;
   final Function(ui.Image?) onImageProcessed;
 
-  EditCarouselOptions({
+  const EditCarouselOptions({
+    Key? key,
     required this.imagePaths,
     required this.originalImagePath,
     required this.onImageProcessed,
-  });
+  }) : super(key: key);
 
   @override
   _EditCarouselOptionsState createState() => _EditCarouselOptionsState();
@@ -22,7 +23,7 @@ class EditCarouselOptions extends StatefulWidget {
 class _EditCarouselOptionsState extends State<EditCarouselOptions> {
   int _selectedIndex = -1;
   ui.Image? _processedImage;
-  bool _isLoading = false; // Variável para controlar o estado de carregamento
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -30,13 +31,13 @@ class _EditCarouselOptionsState extends State<EditCarouselOptions> {
       children: [
         Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20), // Bordas arredondadas
+            borderRadius: BorderRadius.circular(20),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: CarouselSlider(
               options: CarouselOptions(
-                height: 100,
+                height: 70,
                 enlargeCenterPage: true,
                 enableInfiniteScroll: true,
                 autoPlay: false,
@@ -51,35 +52,43 @@ class _EditCarouselOptionsState extends State<EditCarouselOptions> {
                       onTap: () async {
                         setState(() {
                           _selectedIndex = index;
-                          _isLoading = true; // Inicia o carregamento
-                        
+                          _isLoading = true;
                         });
 
-                        String selectedHairImagePath = imagePath;
+                        try {
+                          String selectedHairImagePath = imagePath;
+                          ImageProcessor processor = ImageProcessor(
+                            widget.originalImagePath,
+                            selectedHairImagePath,
+                          );
 
-                        // Processar a imagem
-                        ImageProcessor processor = ImageProcessor(
-                          widget.originalImagePath,
-                          selectedHairImagePath,
-                        );
+                          print('Iniciando o processamento da imagem...');
+                          Uint8List processedImageBytes =
+                              await processor.processImages();
+                          print(
+                              'Imagem processada com sucesso. Convertendo para ui.Image...');
+                          ui.Image processedImage =
+                              await _uint8ListToUiImage(processedImageBytes);
 
-                        // Supondo que processImages() retorne Uint8List
-                        Uint8List processedImageBytes =
-                            await processor.processImages();
-
-                        // Converter Uint8List para ui.Image
-                        ui.Image processedImage =
-                            await _uint8ListToUiImage(processedImageBytes);
-
-                        setState(() {
-                          _processedImage = processedImage;
-                          widget.onImageProcessed(processedImage);
-                          _isLoading = false; // Termina o carregamento
-                        });
+                          setState(() {
+                            _processedImage = processedImage;
+                            widget.onImageProcessed(processedImage);
+                          });
+                        } catch (error) {
+                          print('Erro ao processar a imagem: $error');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Erro ao processar imagem')),
+                          );
+                        } finally {
+                          setState(() {
+                            _isLoading = false;
+                          });
+                        }
                       },
                       child: ClipOval(
                         child: Stack(
-                          alignment: Alignment.center, // Centraliza o CircularProgressIndicator
+                          alignment: Alignment.center,
                           children: [
                             Container(
                               decoration: BoxDecoration(
@@ -89,10 +98,11 @@ class _EditCarouselOptionsState extends State<EditCarouselOptions> {
                                   fit: BoxFit.cover,
                                 ),
                               ),
-                              width: 100,
+                              width: 70,
+                             
                             ),
-                            if (_isLoading && _selectedIndex == index) // Exibe o CircularProgressIndicator apenas para a imagem selecionada
-                              CircularProgressIndicator(),
+                            if (_isLoading && _selectedIndex == index)
+                              const CircularProgressIndicator(),
                           ],
                         ),
                       ),
@@ -107,10 +117,14 @@ class _EditCarouselOptionsState extends State<EditCarouselOptions> {
     );
   }
 
-  // Função auxiliar para converter Uint8List para ui.Image
   Future<ui.Image> _uint8ListToUiImage(Uint8List uint8List) async {
-    final codec = await ui.instantiateImageCodec(uint8List);
-    final frame = await codec.getNextFrame();
-    return frame.image;
+    try {
+      final codec = await ui.instantiateImageCodec(uint8List);
+      final frame = await codec.getNextFrame();
+      return frame.image;
+    } catch (e) {
+      print('Erro ao converter Uint8List para ui.Image: $e');
+      throw e;
+    }
   }
 }

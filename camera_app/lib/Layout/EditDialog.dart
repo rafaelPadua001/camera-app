@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'EditCarouselOptions.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img; // Para manipulação de imagens
 
 class EditDialog extends StatefulWidget {
   final File image; // Imagem original
@@ -20,49 +21,52 @@ class EditDialog extends StatefulWidget {
 
 class _EditDialogState extends State<EditDialog> {
   ui.Image? processedImage;
-  Uint8List? processedImageBytes; // Nova variável para armazenar os bytes
+  Uint8List? processedImageBytes;
   Offset _hairPosition = Offset(100, 100);
-  bool isLoading = false; // Flag para controle de carregamento
+  bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    processedImage = widget.processedImage; // Inicializa a imagem processada
+    processedImage = widget.processedImage;
     if (processedImage != null) {
-      _convertImageToBytes(
-          processedImage!); // Converte para bytes se não for nula
+      _convertImageToBytes(processedImage!);
     }
   }
 
   Future<void> _convertImageToBytes(ui.Image image) async {
-    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData != null) {
-      setState(() {
-        processedImageBytes =
-            byteData.buffer.asUint8List(); // Armazena os bytes
-      });
+    try {
+      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData != null) {
+        setState(() {
+          processedImageBytes = byteData.buffer.asUint8List();
+        });
+      }
+    } catch (e) {
+      print('Erro ao converter imagem: $e');
     }
   }
 
   Future<void> _saveImageToCache(Uint8List imageBytes) async {
     try {
-      // Obtém o diretório temporário (cache) do dispositivo
       final directory = await getTemporaryDirectory();
-      
-      // Gera um nome único baseado no timestamp atual
       final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final imagePath = '${directory.path}/image_${timestamp}.png';
-      
-      // Cria o arquivo e escreve os bytes da imagem
       final file = File(imagePath);
       await file.writeAsBytes(imageBytes);
-
-      // Exibe uma mensagem de sucesso
       print('Imagem salva em: $imagePath');
     } catch (e) {
-      // Lida com erros de salvamento
       print('Erro ao salvar a imagem: $e');
     }
+  }
+
+  Uint8List _resizeImage(Uint8List imageBytes, int width, int height) {
+    img.Image? image = img.decodeImage(imageBytes);
+    if (image == null) {
+      throw Exception('Erro ao decodificar a imagem');
+    }
+    img.Image resizedImage = img.copyResize(image, width: width, height: height);
+    return Uint8List.fromList(img.encodePng(resizedImage));
   }
 
   @override
@@ -77,19 +81,17 @@ class _EditDialogState extends State<EditDialog> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.black.withOpacity(0.7), // Cor inicial do gradiente
-              Colors.grey.withOpacity(0.1), // Cor final do gradiente
+              Colors.black.withOpacity(0.7),
+              Colors.grey.withOpacity(0.1),
             ],
-            begin: Alignment.topLeft, // Direção do gradiente
+            begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius:
-              BorderRadius.circular(20), // Borda arredondada, se desejado
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            //  Text('Edit Dialog', style: TextStyle(color: Colors.white)),
             SizedBox(height: 10),
             Center(
               child: ClipRRect(
@@ -99,30 +101,21 @@ class _EditDialogState extends State<EditDialog> {
                     maxHeight: 450,
                     maxWidth: 400,
                   ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(50),
-                    //  color: Colors.black.withOpacity(0.9),
-                  ),
                   child: Stack(
-                    alignment:
-                        Alignment.center, // Centraliza o conteúdo no Stack
+                    alignment: Alignment.center,
                     children: [
-                      // Exibe a imagem processada ou a imagem original
                       processedImageBytes != null
                           ? Image.memory(
-                              processedImageBytes!, // Exibe a imagem processada
-                              fit: BoxFit
-                                  .cover, // Ajusta o tamanho da imagem para cobrir o Container
+                              processedImageBytes!,
+                              fit: BoxFit.cover,
                             )
                           : Image.file(
                               widget.image,
                               fit: BoxFit.cover,
                             ),
-                      // Exibe o CircularProgressIndicator se isLoading for true
                       if (isLoading)
                         CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.blueAccent), // Cor do indicador
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blueAccent),
                         ),
                     ],
                   ),
@@ -143,12 +136,11 @@ class _EditDialogState extends State<EditDialog> {
                   'assets/haircut/image8.jpg',
                   'assets/haircut/image9.png',
                   'assets/haircut/image10.png',
-                ], // Adicione os caminhos das imagens aqui
-                originalImagePath:
-                    widget.image.path, // Passe o caminho da imagem original
+                ],
+                originalImagePath: widget.image.path,
                 onImageProcessed: (ui.Image? newImage) async {
                   setState(() {
-                    isLoading = true; // Inicia o carregamento
+                    isLoading = true;
                   });
                   if (newImage == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -156,49 +148,59 @@ class _EditDialogState extends State<EditDialog> {
                         content: Text('Nenhum Rosto detectado...'),
                       ),
                     );
+                    setState(() {
+                      isLoading = false;
+                    });
+                    return;
                   } else {
-                    await _convertImageToBytes(
-                        newImage); // Converte a nova imagem processada para bytes
+                    await _convertImageToBytes(newImage);
+                    if (processedImageBytes != null) {
+                      try {
+                        Uint8List resizedImageBytes = _resizeImage(
+                          processedImageBytes!,
+                          600,
+                          800,
+                        );
+                        setState(() {
+                          processedImageBytes = resizedImageBytes;
+                          processedImage = newImage;
+                          isLoading = false;
+                        });
+                      } catch (e) {
+                        print('Erro ao redimensionar a imagem: $e');
+                        setState(() {
+                          isLoading = false;
+                        });
+                      }
+                    }
                   }
-                  setState(() {
-                    processedImage = newImage; // Atualiza a imagem processada
-                    isLoading = false; // Para o carregamento
-                  });
                 },
               ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                // ... outros widgets ...
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Close'),
-                    ),
-                    SizedBox(width: 8), // Espaçamento entre os botões
-                    TextButton(
-                      onPressed: () async {
-                        if (processedImageBytes != null) {
-                          await _saveImageToCache(
-                              processedImageBytes!); // Salva a imagem processada
-                          Navigator.pop(context, true);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content:
-                                  Text('Nenhuma imagem processada disponível.'),
-                            ),
-                          );
-                        }
-                      },
-                      child: const Text('Save'),
-                    ),
-                  ],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Close'),
+                ),
+                SizedBox(width: 8),
+                TextButton(
+                  onPressed: () async {
+                    if (processedImageBytes != null) {
+                      await _saveImageToCache(processedImageBytes!);
+                      Navigator.pop(context, true);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Nenhuma imagem processada disponível.'),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Save'),
                 ),
               ],
             ),
