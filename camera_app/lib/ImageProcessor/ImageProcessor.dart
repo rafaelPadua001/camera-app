@@ -1,10 +1,8 @@
 import 'dart:typed_data';
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'dart:math';
+import '/helpers/TensorFlowHelper.dart';
 
 class ImageProcessor {
   final String originalImagePath;
@@ -13,188 +11,161 @@ class ImageProcessor {
   ImageProcessor(this.originalImagePath, this.selectedHairImagePath);
 
   Future<Uint8List> processImages() async {
-    // Remover cabelo da imagem original
-    final imageWithoutHair = await removeHair();
+    TensorFlowHelper tensorFlowHelper = TensorFlowHelper();
 
-    // Decodificar a imagem sem cabelo
-    img.Image originalImage = img.decodeImage(imageWithoutHair)!;
+    // Carregar o modelo
+    await tensorFlowHelper.loadModel(modelPath: 'assets/models/model.tflite');
 
-    // Carregar a imagem de cabelo selecionada
-    final selectedHairImageBytes = await _loadImageBytes(selectedHairImagePath);
-    img.Image selectedHairImage = img.decodeImage(selectedHairImageBytes)!;
+    // Carregar os bytes da imagem original e da imagem de cabelo
+    Uint8List originalImageBytes = await _loadImageBytes(originalImagePath);
+    Uint8List hairImageBytes = await _loadImageBytes(selectedHairImagePath);
 
-    // Criar as opções para o detector de rosto
-    final FaceDetectorOptions options = FaceDetectorOptions(
-      enableContours: true,
-      enableClassification: true,
-    );
-
-    // Criar o detector de rosto com as opções
-    final FaceDetector faceDetector = FaceDetector(options: options);
-
-    // Detectar o rosto na imagem original
-    final faces = await faceDetector.processImage(InputImage.fromFilePath(originalImagePath));
-
-    if (faces.isEmpty) {
-      throw Exception('Nenhum rosto detectado.');
+    // Verificar se os bytes da imagem original estão vazios
+    if (originalImageBytes.isEmpty) {
+      throw Exception("Erro: Bytes da imagem original estão vazios.");
     }
 
-    Face face = faces.first;
+    // Decodificar a imagem original
+    img.Image? originalImage = img.decodeImage(originalImageBytes);
 
-    // Calcular a largura e altura do rosto detectado
-    double faceWidth = _calculateFaceWidth(face);
-    double faceHeight = face.boundingBox.height.toDouble();
+    if (originalImage == null) {
+      throw Exception("Erro ao decodificar a imagem original.");
+    }
 
-    // Calcular o fator de redimensionamento do cabelo
-    double hairWidthFactor = faceWidth / selectedHairImage.width;
-    double hairHeightFactor = faceHeight / selectedHairImage.height;
+    // Obter a máscara de cabelo
+    List<int>? hairMask =
+        await tensorFlowHelper.getHairMask(originalImageBytes);
 
-    // Redimensionar a imagem do cabelo
-    img.Image resizedHairImage = img.copyResize(
-      selectedHairImage,
-      width: (selectedHairImage.width * hairWidthFactor * 1.0).toInt(),
-      height: (selectedHairImage.height * hairHeightFactor).toInt(),
-    );
+    // Verificar o tamanho da máscara de cabelo
+    if (hairMask == null || hairMask.length != 256 * 256) {
+      print("Erro: Máscara de cabelo está com tamanho incompatível.");
+      print("Tamanho da máscara de cabelo: ${hairMask?.length}");
+      print("Tamanho esperado: ${256 * 256}");
+      throw Exception(
+          "Erro ao obter a máscara de cabelo ou tamanho incompatível.");
+    }
 
-    // Calcular a posição do cabelo na imagem original
-    int hairX = (face.boundingBox.left + (faceWidth / 2) - (resizedHairImage.width / 2)).toInt();
-    int hairY = (face.boundingBox.top * 0.54).toInt(); // Ajuste para que o cabelo fique acima do rosto
+    // Redimensionar a máscara de cabelo para corresponder ao tamanho da imagem original
+    img.Image maskImage =
+        _resizeMaskToImageSize(hairMask, 256, 256); // Tamanho 128x128
 
-    // Desenhar o cabelo na imagem original
-    img.drawImage(originalImage, resizedHairImage, dstX: hairX, dstY: hairY);
+    // Converter `maskImage` para `List<int>`
+    List<int> maskImageData = maskImage.getBytes();
 
-    // Retornar a imagem final
-    return Uint8List.fromList(img.encodePng(originalImage));
+    // Aplicar a máscara de cabelo
+    Uint8List processedImage = _applyHairMask(originalImage, hairImageBytes,
+        hairMask: hairMask, // Parâmetro nomeado para a máscara de cabelo
+        maskImageData:
+            maskImageData // Parâmetro nomeado para os dados da máscara
+        );
+
+    // Fechar o modelo
+    await tensorFlowHelper.closeModel();
+
+    return processedImage;
+  }
+
+  img.Image _resizeMaskToImageSize(List<int> mask, int width, int height) {
+    img.Image maskImage = img.Image(width: width, height: height);
+
+    // Preencher a imagem com os valores da máscara
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        int index = y * width + x;
+        int value = mask[index] == 1 ? 255 : 0;
+
+        maskImage.setPixelRgb(x, y, value, value, value);
+      }
+    }
+
+    return maskImage;
   }
 
   Future<Uint8List> _loadImageBytes(String path) async {
-    Uint8List bytes;
-
-    // Carregar imagem de assets ou do sistema de arquivos
     if (path.startsWith('assets/')) {
       final data = await rootBundle.load(path);
-      bytes = data.buffer.asUint8List();
+      return data.buffer.asUint8List();
     } else {
       final File file = File(path);
-      bytes = await file.readAsBytes();
-    }
-    return bytes;
-  }
-
-  Future<Face?> _detectFace(Uint8List imageBytes) async {
-    final inputImage = InputImage.fromFilePath(originalImagePath);
-
-    final options = FaceDetectorOptions(
-      performanceMode: FaceDetectorMode.accurate,
-      enableLandmarks: true,
-    );
-    final faceDetector = FaceDetector(options: options);
-
-    final List<Face> faces = await faceDetector.processImage(inputImage);
-    faceDetector.close();
-
-    if (faces.isNotEmpty) {
-      return faces.first;
-    }
-    return null;
-  }
-
-  double _calculateFaceWidth(Face face) {
-    final Point<int>? leftEye = face.landmarks[FaceLandmarkType.leftEye]?.position;
-    final Point<int>? rightEye = face.landmarks[FaceLandmarkType.rightEye]?.position;
-    final Point<int>? leftEar = face.landmarks[FaceLandmarkType.leftEar]?.position;
-    final Point<int>? rightEar = face.landmarks[FaceLandmarkType.rightEar]?.position;
-
-    final Point<int> topOfHead = Point<int>(
-      face.boundingBox.topLeft.dx.round(),
-      face.boundingBox.topLeft.dy.round(),
-    );
-
-    if (leftEye != null && rightEye != null) {
-      double eyeDistance = (rightEye.x.toDouble() - leftEye.x.toDouble()).abs();
-      double faceHeight = (face.boundingBox.bottomRight.dy - topOfHead.y.toDouble()).abs();
-      double refinedWidth = eyeDistance * 1.8;
-      double margin = faceHeight * 0.3;
-
-      return refinedWidth + margin;
-    } else if (leftEar != null && rightEar != null) {
-      double earDistance = (rightEar.x.toDouble() - leftEar.x.toDouble()).abs();
-      return earDistance + (earDistance * 0.4);
-    } else {
-      return face.boundingBox.width.toDouble();
+      return await file.readAsBytes();
     }
   }
 
-  Future<Uint8List> removeHair() async {
-    // Carregar a imagem original
-  final originalImageBytes = await _loadImageBytes(originalImagePath);
-  img.Image originalImage = img.decodeImage(originalImageBytes)!;
-
-  // Configurar as opções do detector de rosto
-  final FaceDetectorOptions options = FaceDetectorOptions(
-    enableContours: true, // Habilitar contornos para detecção detalhada
-    enableClassification: true, // Habilitar classificação
-  );
-
-  // Criar o detector de rosto
-  final FaceDetector faceDetector = FaceDetector(options: options);
-
-  // Detectar o rosto na imagem
-  final faces = await faceDetector.processImage(InputImage.fromFilePath(originalImagePath));
-
-  if (faces.isEmpty) {
-    throw Exception('Nenhum rosto detectado.');
-  }
-
-  Face face = faces.first;
-
-  // Estimar a posição e tamanho do cabelo com base na posição do rosto
-  double faceWidth = _calculateFaceWidth(face);
-  int hairTopY = (face.boundingBox.top - face.boundingBox.height * 0.3).toInt(); // Acima da testa
-  int hairBottomY = face.boundingBox.top.toInt(); // Testa
-
-  // Substituir o cabelo com uma região suavizada em vez de um retângulo sólido
-  for (int y = hairTopY; y < hairBottomY; y++) {
-    for (int x = face.boundingBox.left.toInt(); x < face.boundingBox.right.toInt(); x++) {
-      // Aplicar uma técnica de blur para suavizar a área do cabelo
-      originalImage = _applyBlurToArea(originalImage, x, y);
-    }
-  }
-
-  // Retornar a imagem final suavizada
-  return Uint8List.fromList(img.encodePng(originalImage));
-}
-
-img.Image _applyBlurToArea(img.Image image, int x, int y) {
-  // Definir a intensidade do blur
-  const int blurRadius = 5;
+  Uint8List _applyHairMask(
+    img.Image originalImage,
+    Uint8List hairImageBytes, {
+    required List<int> hairMask,
+    required List<int> maskImageData,
+    double scale = 0.8,
+    int verticalShift = -7,
+    double widthIncrease = 1.2,
+    int maskMargin = 1, // Adicione uma margem para a máscara
   
-  int r = 0, g = 0, b = 0, count = 0;
+  }) {
+    // Decodifique a imagem de cabelo
+    final hairImage = img.decodeImage(hairImageBytes);
+    if (hairImage == null) {
+      throw Exception("Erro ao decodificar a imagem de cabelo.");
+    }
 
-  // Aplicar blur gaussiano ao redor da área selecionada
-  for (int i = -blurRadius; i <= blurRadius; i++) {
-    for (int j = -blurRadius; j <= blurRadius; j++) {
-      int newX = x + i;
-      int newY = y + j;
+    // Redimensione a imagem de cabelo
+    final newWidth = (originalImage.width * scale * widthIncrease).toInt();
+    final newHeight = (originalImage.height * scale).toInt();
+    final resizedHairImage = img.copyResize(hairImage,
+        width: newWidth,
+        height: newHeight,
+        interpolation: img.Interpolation.linear);
 
-      if (newX >= 0 && newX < image.width && newY >= 0 && newY < image.height) {
-        int pixelColor = image.getPixel(newX, newY);
-        r += img.getRed(pixelColor);
-        g += img.getGreen(pixelColor);
-        b += img.getBlue(pixelColor);
-        count++;
+    // Calcule o deslocamento para centralizar a imagem de cabelo
+    final offsetX = (originalImage.width - newWidth) ~/ 2;
+    final offsetY = (originalImage.height - newHeight) ~/ 2 + verticalShift;
+
+    // Adapte as dimensões da máscara
+    final maskWidth = (256 * originalImage.width) ~/ originalImage.width;
+    final maskHeight = (256 * originalImage.height) ~/ originalImage.height;
+
+    // Aplique a máscara de cabelo
+    for (int y = 0; y < newHeight; y++) {
+      for (int x = 0; x < newWidth; x++) {
+        final targetX = x + offsetX;
+        final targetY = y + offsetY;
+
+        if (targetX >= 0 &&
+            targetX < originalImage.width &&
+            targetY >= 0 &&
+            targetY < originalImage.height) {
+          // Verifique a posição (targetX, targetY) dentro da máscara com margem
+          final maskX = (targetX * maskWidth) ~/ originalImage.width;
+          final maskY = (targetY * maskHeight) ~/ originalImage.height;
+
+          // Aplique a margem ao redor da máscara
+          bool isWithinMargin = false;
+          for (int i = -maskMargin; i <= maskMargin; i++) {
+            for (int j = -maskMargin; j <= maskMargin; j++) {
+              final marginX = maskX + i;
+              final marginY = maskY + j;
+              if (marginX >= 0 &&
+                  marginX < maskWidth &&
+                  marginY >= 0 &&
+                  marginY < maskHeight &&
+                  hairMask[marginY * maskWidth + marginX] == 1) {
+                isWithinMargin = true;
+                break;
+              }
+            }
+            if (isWithinMargin) break;
+          }
+
+          // Aplique a imagem de cabelo se estiver dentro da margem
+          if (isWithinMargin) {
+            final hairPixelInt = resizedHairImage.getPixel(x, y);
+            originalImage.setPixel(targetX, targetY, hairPixelInt);
+          }
+        }
       }
     }
-  }
 
-  // Calcular a média das cores ao redor
-  r = (r / count).toInt();
-  g = (g / count).toInt();
-  b = (b / count).toInt();
-
-  // Substituir o pixel na posição atual pela cor média
-  image.setPixel(x, y, img.getColor(r, g, b));
-
-  return image;
+    // Codifique a imagem final como PNG e retorne como Uint8List
+    return Uint8List.fromList(img.encodePng(originalImage, level: 0));
   }
 }
