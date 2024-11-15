@@ -96,9 +96,8 @@ class ImageProcessor {
     Uint8List hairImageBytes, {
     required List<int> hairMask,
     required List<int> maskImageData,
-    double scale = 0.8,
-    int verticalShift = -7,
-    double widthIncrease = 1.2,
+    double scale = 0.71,
+    double widthIncrease = 0.98,
     int maskMargin = 1, // Adicione uma margem para a máscara
   
   }) {
@@ -118,7 +117,7 @@ class ImageProcessor {
 
     // Calcule o deslocamento para centralizar a imagem de cabelo
     final offsetX = (originalImage.width - newWidth) ~/ 2;
-    final offsetY = (originalImage.height - newHeight) ~/ 2 + verticalShift;
+    final offsetY = (originalImage.height - newHeight) ~/ 2;
 
     // Adapte as dimensões da máscara
     final maskWidth = (256 * originalImage.width) ~/ originalImage.width;
