@@ -77,8 +77,8 @@ class ImageProcessor {
         maskImage.setPixelRgb(x, y, value, value, value);
       }
     }
-
-    return maskImage;
+    final blurredImage = img.gaussianBlur(maskImage, radius: 10);
+    return blurredImage;
   }
 
   Future<Uint8List> _loadImageBytes(String path) async {
@@ -96,9 +96,10 @@ class ImageProcessor {
     Uint8List hairImageBytes, {
     required List<int> hairMask,
     required List<int> maskImageData,
-    double scale = 0.71,
-    double widthIncrease = 0.98,
-    int maskMargin = 1, // Adicione uma margem para a máscara
+    double scale = 0.70,
+    double widthIncrease = 0.90,
+    double heightIncrease = 1,
+    int maskMargin = 0, // Adicione uma margem para a máscara
   
   }) {
     // Decodifique a imagem de cabelo
@@ -109,7 +110,7 @@ class ImageProcessor {
 
     // Redimensione a imagem de cabelo
     final newWidth = (originalImage.width * scale * widthIncrease).toInt();
-    final newHeight = (originalImage.height * scale).toInt();
+    final newHeight = ((originalImage.height * scale) - heightIncrease).toInt();
     final resizedHairImage = img.copyResize(hairImage,
         width: newWidth,
         height: newHeight,
@@ -123,6 +124,7 @@ class ImageProcessor {
     final maskWidth = (256 * originalImage.width) ~/ originalImage.width;
     final maskHeight = (256 * originalImage.height) ~/ originalImage.height;
 
+    
     // Aplique a máscara de cabelo
     for (int y = 0; y < newHeight; y++) {
       for (int x = 0; x < newWidth; x++) {
@@ -156,15 +158,19 @@ class ImageProcessor {
           }
 
           // Aplique a imagem de cabelo se estiver dentro da margem
-          if (isWithinMargin) {
-            final hairPixelInt = resizedHairImage.getPixel(x, y);
-            originalImage.setPixel(targetX, targetY, hairPixelInt);
+            if (isWithinMargin) {
+          final hairPixel = resizedHairImage.getPixel(x, y);
+
+          // Use transparência apenas se necessário
+          if (hairPixel.a > 0) { // Componente alfa é maior que 0
+            originalImage.setPixel(targetX, targetY, hairPixel);
           }
+        }
         }
       }
     }
 
     // Codifique a imagem final como PNG e retorne como Uint8List
-    return Uint8List.fromList(img.encodePng(originalImage, level: 0));
+    return Uint8List.fromList(img.encodePng(originalImage));
   }
 }
