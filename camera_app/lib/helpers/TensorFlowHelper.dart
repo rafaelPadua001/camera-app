@@ -8,13 +8,13 @@ class TensorFlowHelper {
   Future<void> loadModel({required String modelPath}) async {
     try {
       _interpreter = await Interpreter.fromAsset(modelPath);
-      print('Modelo carregado com sucesso.');
+     // print('Modelo carregado com sucesso.');
 
       // Verifica as dimensões de entrada e saída
       var inputShape = _interpreter?.getInputTensor(0).shape;
       var outputShape = _interpreter?.getOutputTensor(0).shape;
-      print('Dimensões esperadas de entrada: $inputShape');
-      print('Dimensões esperadas de saída: $outputShape');
+      // print('Dimensões esperadas de entrada: $inputShape');
+      // print('Dimensões esperadas de saída: $outputShape');
     } catch (e) {
       print('Erro ao carregar o modelo: $e');
     }
@@ -44,7 +44,7 @@ class TensorFlowHelper {
     _interpreter?.run(inputTensor, output);
 
     // Verificar a forma da saída
-    print('Saída do modelo: $output');
+    // print('Saída do modelo: $output');
 
     // Converte a saída para uma máscara binária
     var binaryMask = output[0]

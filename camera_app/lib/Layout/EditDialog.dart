@@ -24,7 +24,7 @@ class _EditDialogState extends State<EditDialog> {
   Uint8List? processedImageBytes;
   Offset _hairPosition = Offset(100, 100);
   bool isLoading = false;
-
+  String _selectedOption = 'Select Hair';
   @override
   void initState() {
     super.initState();
@@ -36,7 +36,8 @@ class _EditDialogState extends State<EditDialog> {
 
   Future<void> _convertImageToBytes(ui.Image image) async {
     try {
-      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData != null) {
         setState(() {
           processedImageBytes = byteData.buffer.asUint8List();
@@ -65,7 +66,8 @@ class _EditDialogState extends State<EditDialog> {
     if (image == null) {
       throw Exception('Erro ao decodificar a imagem');
     }
-    img.Image resizedImage = img.copyResize(image, width: width, height: height);
+    img.Image resizedImage =
+        img.copyResize(image, width: width, height: height);
     return Uint8List.fromList(img.encodePng(resizedImage));
   }
 
@@ -115,7 +117,8 @@ class _EditDialogState extends State<EditDialog> {
                             ),
                       if (isLoading)
                         CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.blueAccent),
                         ),
                     ],
                   ),
@@ -123,60 +126,99 @@ class _EditDialogState extends State<EditDialog> {
               ),
             ),
             SizedBox(height: 2),
-            Expanded(
-              child: EditCarouselOptions(
-                imagePaths: const [
-                  'assets/haircut/image1.png',
-                  'assets/haircut/image2.png',
-                  'assets/haircut/image3.png',
-                  'assets/haircut/image4.png',
-                  'assets/haircut/image5.png',
-                  'assets/haircut/image6.png',
-                  'assets/haircut/image7.png',
-                  'assets/haircut/image8.jpg',
-                  'assets/haircut/image9.png',
-                  'assets/haircut/image10.png',
-                ],
-                originalImagePath: widget.image.path,
-                onImageProcessed: (ui.Image? newImage) async {
-                  setState(() {
-                    isLoading = true;
-                  });
-                  if (newImage == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Nenhum Rosto detectado...'),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SegmentedButton<String>(
+                    segments: const <ButtonSegment<String>>[
+                      ButtonSegment<String>(
+                          value: 'hairs',
+                          label: Text('Hairs'),
+                          icon: Icon(Icons.cut)),
+                      ButtonSegment<String>(
+                        value: 'colors',
+                        label: Text('Colors'),
+                        icon: Icon(Icons.color_lens),
                       ),
-                    );
-                    setState(() {
-                      isLoading = false;
-                    });
-                    return;
-                  } else {
-                    await _convertImageToBytes(newImage);
-                    if (processedImageBytes != null) {
-                      try {
-                        Uint8List resizedImageBytes = _resizeImage(
-                          processedImageBytes!,
-                          600,
-                          800,
-                        );
-                        setState(() {
-                          processedImageBytes = resizedImageBytes;
-                          processedImage = newImage;
-                          isLoading = false;
-                        });
-                      } catch (e) {
-                        print('Erro ao redimensionar a imagem: $e');
-                        setState(() {
-                          isLoading = false;
-                        });
-                      }
-                    }
-                  }
-                },
+                      ButtonSegment<String>(value: 'cut', label: Text('Cut')),
+                    ],
+                    selected: <String>{_selectedOption},
+                    onSelectionChanged: (Set<String> newSelection) {
+                      setState(() {
+                        _selectedOption = newSelection.first;
+                      });
+                      print('Selected: $_selectedOption');
+                    },
+                  ),
+                ],
               ),
             ),
+            SizedBox(
+              height: 2,
+            ),
+            Expanded(
+                child: _selectedOption == 'hairs'
+                    ? Center(
+                        child: EditCarouselOptions(
+                        imagePaths: const [
+                          'assets/haircut/image1.png',
+                          'assets/haircut/image2.png',
+                          'assets/haircut/image3.png',
+                          'assets/haircut/image4.png',
+                          'assets/haircut/image5.png',
+                          'assets/haircut/image6.png',
+                          'assets/haircut/image7.png',
+                          'assets/haircut/image8.jpg',
+                          'assets/haircut/image9.png',
+                          'assets/haircut/image10.png',
+                        ],
+                        originalImagePath: widget.image.path,
+                        onImageProcessed: (ui.Image? newImage) async {
+                          setState(() {
+                            isLoading = true;
+                          });
+                          if (newImage == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Nenhum Rosto detectado...'),
+                              ),
+                            );
+                            setState(() {
+                              isLoading = false;
+                            });
+                            return;
+                          } else {
+                            await _convertImageToBytes(newImage);
+                            if (processedImageBytes != null) {
+                              try {
+                                Uint8List resizedImageBytes = _resizeImage(
+                                  processedImageBytes!,
+                                  600,
+                                  800,
+                                );
+                                setState(() {
+                                  processedImageBytes = resizedImageBytes;
+                                  processedImage = newImage;
+                                  isLoading = false;
+                                });
+                              } catch (e) {
+                                print('Erro ao redimensionar a imagem: $e');
+                                setState(() {
+                                  isLoading = false;
+                                });
+                              }
+                            }
+                          }
+                        },
+                      ))
+                    : _selectedOption == 'colors'
+                        ? Center(
+                            child: Text('Colors option selected'),
+                          )
+                        : Center(
+                            child: Text('Cut option selected'),
+                          )),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -195,7 +237,8 @@ class _EditDialogState extends State<EditDialog> {
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Nenhuma imagem processada disponível.'),
+                          content:
+                              Text('Nenhuma imagem processada disponível.'),
                         ),
                       );
                     }
