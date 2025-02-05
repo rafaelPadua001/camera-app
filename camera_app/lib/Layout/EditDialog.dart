@@ -150,12 +150,19 @@ class _EditDialogState extends State<EditDialog> {
                       });
                       print('Selected: $_selectedOption');
                     },
+                    style: SegmentedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      selectedBackgroundColor: Colors.white,
+                      selectedForegroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      side: BorderSide(color: Colors.white),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-            SizedBox(
-              height: 2,
             ),
             Expanded(
                 child: _selectedOption == 'hairs'
