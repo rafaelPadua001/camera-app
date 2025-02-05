@@ -1,7 +1,7 @@
-import 'dart:typed_data';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
+import 'package:path_provider/path_provider.dart';
 import '/helpers/TensorFlowHelper.dart';
 
 class ImageProcessor {
@@ -10,54 +10,51 @@ class ImageProcessor {
 
   ImageProcessor(this.originalImagePath, this.selectedHairImagePath);
 
+  static const int maskDimension = 256;
+
   Future<Uint8List> processImages() async {
-    TensorFlowHelper tensorFlowHelper = TensorFlowHelper();
+    final tensorFlowHelper = TensorFlowHelper();
 
     // Carregar o modelo
     await tensorFlowHelper.loadModel(modelPath: 'assets/models/model.tflite');
 
-    // Carregar os bytes da imagem original e da imagem de cabelo
-    Uint8List originalImageBytes = await _loadImageBytes(originalImagePath);
-    Uint8List hairImageBytes = await _loadImageBytes(selectedHairImagePath);
+    // Carregar bytes das imagens
+    final originalImageBytes = await _loadImageBytes(originalImagePath);
+    final hairImageBytes = await _loadImageBytes(selectedHairImagePath);
 
-    // Verificar se os bytes da imagem original estão vazios
+    // Verificar validade das imagens carregadas
     if (originalImageBytes.isEmpty) {
       throw Exception("Erro: Bytes da imagem original estão vazios.");
     }
 
-    // Decodificar a imagem original
-    img.Image? originalImage = img.decodeImage(originalImageBytes);
-
+    final originalImage = img.decodeImage(originalImageBytes);
     if (originalImage == null) {
       throw Exception("Erro ao decodificar a imagem original.");
     }
 
-    // Obter a máscara de cabelo
-    List<int>? hairMask =
-        await tensorFlowHelper.getHairMask(originalImageBytes);
-
-    // Verificar o tamanho da máscara de cabelo
-    if (hairMask == null || hairMask.length != 256 * 256) {
-      print("Erro: Máscara de cabelo está com tamanho incompatível.");
-      print("Tamanho da máscara de cabelo: ${hairMask?.length}");
-      print("Tamanho esperado: ${256 * 256}");
-      throw Exception(
-          "Erro ao obter a máscara de cabelo ou tamanho incompatível.");
+    // Obter máscara de cabelo
+    final hairMask = await tensorFlowHelper.getHairMask(originalImageBytes);
+    if (hairMask == null || hairMask.length != maskDimension * maskDimension) {
+      throw Exception("Erro ao obter ou validar a máscara de cabelo.");
     }
 
-    // Redimensionar a máscara de cabelo para corresponder ao tamanho da imagem original
-    img.Image maskImage =
-        _resizeMaskToImageSize(hairMask, 256, 256); // Tamanho 128x128
+    // Redimensionar máscara
+    final resizedMask = _resizeMaskToImageSize(
+        hairMask, maskDimension, originalImage.width, originalImage.height);
+    final blurredMask = _blurMask(resizedMask, 8);
 
-    // Converter `maskImage` para `List<int>`
-    List<int> maskImageData = maskImage.getBytes();
+    // await _saveDebugImage(resizedMask, 'debug_resized_mask.png');
 
-    // Aplicar a máscara de cabelo
-    Uint8List processedImage = _applyHairMask(originalImage, hairImageBytes,
-        hairMask: hairMask, // Parâmetro nomeado para a máscara de cabelo
-        maskImageData:
-            maskImageData // Parâmetro nomeado para os dados da máscara
-        );
+    // Aplicar máscara de cabelo
+    final processedImage = _applyHairMask(
+      originalImage,
+      hairImageBytes,
+      hairMask: hairMask,
+      maskMargin: 0, // Ajustável
+    );
+
+    // Salvar imagem processada para depuração
+    // await _saveDebugImage(originalImage, 'debug_processed_image.png');
 
     // Fechar o modelo
     await tensorFlowHelper.closeModel();
@@ -65,20 +62,23 @@ class ImageProcessor {
     return processedImage;
   }
 
-  img.Image _resizeMaskToImageSize(List<int> mask, int width, int height) {
-    img.Image maskImage = img.Image(width: width, height: height);
+  img.Image _blurMask(img.Image maskImage, int blurRadius) {
+    return img.gaussianBlur(maskImage, radius: blurRadius);
+  }
 
-    // Preencher a imagem com os valores da máscara
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        int index = y * width + x;
-        int value = mask[index] == 1 ? 255 : 0;
-
+  img.Image _resizeMaskToImageSize(
+      List<int> mask, int maskDimension, int targetWidth, int targetHeight) {
+    final maskImage = img.Image(width: maskDimension, height: maskDimension);
+    for (int y = 0; y < maskDimension; y++) {
+      for (int x = 0; x < maskDimension; x++) {
+        final index = y * maskDimension + x;
+        final value = mask[index] == 1 ? 255 : 0;
         maskImage.setPixelRgb(x, y, value, value, value);
       }
     }
-    final blurredImage = img.gaussianBlur(maskImage, radius: 10);
-    return blurredImage;
+
+    // Redimensiona a máscara para o tamanho da imagem original
+    return img.copyResize(maskImage, width: targetWidth, height: targetHeight);
   }
 
   Future<Uint8List> _loadImageBytes(String path) async {
@@ -86,91 +86,114 @@ class ImageProcessor {
       final data = await rootBundle.load(path);
       return data.buffer.asUint8List();
     } else {
-      final File file = File(path);
+      final file = File(path);
       return await file.readAsBytes();
     }
   }
 
+  // Future<void> _saveDebugImage(img.Image image, String fileName) async {
+  //   try {
+  //     final directory = await getTemporaryDirectory();
+  //     final filePath = '${directory.path}/$fileName';
+  //     final debugFile = File(filePath);
+  //     await debugFile.writeAsBytes(Uint8List.fromList(img.encodePng(image)));
+  //     print('Imagem de depuração salva em: $filePath');
+  //   } catch (e) {
+  //     print('Erro ao salvar a imagem de depuração: $e');
+  //   }
+  // }
+
   Uint8List _applyHairMask(
-    img.Image originalImage,
-    Uint8List hairImageBytes, {
-    required List<int> hairMask,
-    required List<int> maskImageData,
-    double scale = 0.70,
-    double widthIncrease = 0.90,
-    double heightIncrease = 1,
-    int maskMargin = 0, // Adicione uma margem para a máscara
-  
-  }) {
-    // Decodifique a imagem de cabelo
-    final hairImage = img.decodeImage(hairImageBytes);
-    if (hairImage == null) {
-      throw Exception("Erro ao decodificar a imagem de cabelo.");
-    }
+  img.Image originalImage,
+  Uint8List hairImageBytes, {
+  required List<int> hairMask,
+  int maskMargin = 0,
+  double scale = 0.65,
+}) {
+  final hairImage = img.decodeImage(hairImageBytes);
+  if (hairImage == null) {
+    throw Exception("Erro ao decodificar a imagem de cabelo.");
+  }
 
-    // Redimensione a imagem de cabelo
-    final newWidth = (originalImage.width * scale * widthIncrease).toInt();
-    final newHeight = ((originalImage.height * scale) - heightIncrease).toInt();
-    final resizedHairImage = img.copyResize(hairImage,
-        width: newWidth,
-        height: newHeight,
-        interpolation: img.Interpolation.linear);
+  final newWidth = (originalImage.width * scale).toInt();
+  final newHeight = (originalImage.height * scale).toInt();
+  final resizedHairImage = img.copyResize(
+    hairImage,
+    width: newWidth,
+    height: newHeight,
+    interpolation: img.Interpolation.linear,
+  );
 
-    // Calcule o deslocamento para centralizar a imagem de cabelo
-    final offsetX = (originalImage.width - newWidth) ~/ 2;
-    final offsetY = (originalImage.height - newHeight) ~/ 2;
+  final offsetX = (originalImage.width - newWidth) ~/ 2;
+  final offsetY = (originalImage.height - newHeight) ~/ 2;
 
-    // Adapte as dimensões da máscara
-    final maskWidth = (256 * originalImage.width) ~/ originalImage.width;
-    final maskHeight = (256 * originalImage.height) ~/ originalImage.height;
+  for (int y = 0; y < newHeight; y++) {
+    for (int x = 0; x < newWidth; x++) {
+      final targetX = x + offsetX;
+      final targetY = y + offsetY;
 
-    
-    // Aplique a máscara de cabelo
-    for (int y = 0; y < newHeight; y++) {
-      for (int x = 0; x < newWidth; x++) {
-        final targetX = x + offsetX;
-        final targetY = y + offsetY;
+      if (targetX < 0 || targetX >= originalImage.width || targetY < 0 || targetY >= originalImage.height) {
+        continue;
+      }
 
-        if (targetX >= 0 &&
-            targetX < originalImage.width &&
-            targetY >= 0 &&
-            targetY < originalImage.height) {
-          // Verifique a posição (targetX, targetY) dentro da máscara com margem
-          final maskX = (targetX * maskWidth) ~/ originalImage.width;
-          final maskY = (targetY * maskHeight) ~/ originalImage.height;
+      final maskX = (targetX * 256) ~/ originalImage.width;
+      final maskY = (targetY * 256) ~/ originalImage.height;
 
-          // Aplique a margem ao redor da máscara
-          bool isWithinMargin = false;
-          for (int i = -maskMargin; i <= maskMargin; i++) {
-            for (int j = -maskMargin; j <= maskMargin; j++) {
-              final marginX = maskX + i;
-              final marginY = maskY + j;
-              if (marginX >= 0 &&
-                  marginX < maskWidth &&
-                  marginY >= 0 &&
-                  marginY < maskHeight &&
-                  hairMask[marginY * maskWidth + marginX] == 1) {
-                isWithinMargin = true;
-                break;
-              }
-            }
-            if (isWithinMargin) break;
-          }
+      if (_isWithinMask(hairMask, maskX, maskY, 256, maskMargin)) {
+        final hairPixel = resizedHairImage.getPixel(x, y);
 
-          // Aplique a imagem de cabelo se estiver dentro da margem
-            if (isWithinMargin) {
-          final hairPixel = resizedHairImage.getPixel(x, y);
+        // Acessando os componentes de cor diretamente
+        final hairAlpha = hairPixel.a;
+        final hairRed = hairPixel.r;
+        final hairGreen = hairPixel.g;
+        final hairBlue = hairPixel.b;
 
-          // Use transparência apenas se necessário
-          if (hairPixel.a > 0) { // Componente alfa é maior que 0
-            originalImage.setPixel(targetX, targetY, hairPixel);
-          }
-        }
+        if (hairAlpha > 0) {
+          final bgPixel = originalImage.getPixel(targetX, targetY);
+
+          final bgRed = bgPixel.r;
+          final bgGreen = bgPixel.g;
+          final bgBlue = bgPixel.b;
+
+          // Aplicando a transparência correta
+          final alphaFactor = hairAlpha / 255.0;
+          final blendedRed = ((hairRed * alphaFactor) + (bgRed * (1 - alphaFactor))).toInt();
+          final blendedGreen = ((hairGreen * alphaFactor) + (bgGreen * (1 - alphaFactor))).toInt();
+          final blendedBlue = ((hairBlue * alphaFactor) + (bgBlue * (1 - alphaFactor))).toInt();
+
+          // Criando o pixel misturado
+          final blendedPixel = img.ColorRgba8(blendedRed, blendedGreen, blendedBlue, 255);
+
+          originalImage.setPixel(targetX, targetY, blendedPixel);
         }
       }
     }
+  }
 
-    // Codifique a imagem final como PNG e retorne como Uint8List
-    return Uint8List.fromList(img.encodePng(originalImage));
+  return Uint8List.fromList(img.encodePng(originalImage));
+}
+
+  bool _isWithinMask(
+    List<int> hairMask,
+    int maskX,
+    int maskY,
+    int maskDimension,
+    int maskMargin,
+  ) {
+    for (int i = -maskMargin; i <= maskMargin; i++) {
+      for (int j = -maskMargin; j <= maskMargin; j++) {
+        final marginX = maskX + i;
+        final marginY = maskY + j;
+
+        if (marginX >= 0 &&
+            marginX < maskDimension &&
+            marginY >= 0 &&
+            marginY < maskDimension &&
+            hairMask[marginY * maskDimension + marginX] == 1) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }
