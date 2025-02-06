@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'EditCarouselOptions.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img; // Para manipulação de imagens
+import 'ColorPicker.dart';
 
 class EditDialog extends StatefulWidget {
   final File image; // Imagem original
@@ -220,8 +221,10 @@ class _EditDialogState extends State<EditDialog> {
                         },
                       ))
                     : _selectedOption == 'colors'
-                        ? Center(
-                            child: Text('Colors option selected'),
+                        ? SingleChildScrollView(
+                            child: Center(
+                              child: ColorPickerScreen(),
+                            ),
                           )
                         : Center(
                             child: Text('Cut option selected'),
