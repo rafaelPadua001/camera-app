@@ -1,3 +1,4 @@
+import 'dart:ffi';
 import 'dart:typed_data';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -26,6 +27,8 @@ class _EditDialogState extends State<EditDialog> {
   Offset _hairPosition = Offset(100, 100);
   bool isLoading = false;
   String _selectedOption = 'Select Hair';
+  Color _selectedColor = Colors.black;
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +37,24 @@ class _EditDialogState extends State<EditDialog> {
       _convertImageToBytes(processedImage!);
     }
   }
+
+ void _onColorSelected(Color color) {
+  setState(() {
+    _selectedColor = color;
+  });
+
+  if (processedImageBytes != null ) {
+    // Altera cor do cabelo da imagem
+    Uint8List newImageBytes = _changeHairColor(
+      processedImageBytes!,  // Imagem original
+      _selectedColor         // Cor selecionada
+    );
+
+    setState(() {
+      processedImageBytes = newImageBytes;
+    });
+  }
+}
 
   Future<void> _convertImageToBytes(ui.Image image) async {
     try {
@@ -71,6 +92,54 @@ class _EditDialogState extends State<EditDialog> {
         img.copyResize(image, width: width, height: height);
     return Uint8List.fromList(img.encodePng(resizedImage));
   }
+  
+static Uint8List _changeHairColor(Uint8List imageBytes, Color newColor) {
+  img.Image? image = img.decodeImage(imageBytes);
+  if (image == null) {
+    throw Exception('Erro ao decodificar a imagem');
+  }
+
+  for (int y = 0; y < image.height; y++) {
+    for (int x = 0; x < image.width; x++) {
+      img.Pixel pixel = image.getPixel(x, y);
+
+      if (_isHairPixel(pixel)) {
+        // Altera a cor do cabelo para a cor selecionada
+        int r = ((pixel.r * (1 - 0.6)) + (newColor.red * 0.6)).toInt();
+        int g = ((pixel.g * (1 - 0.6)) + (newColor.green * 0.6)).toInt();
+        int b = ((pixel.b * (1 - 0.6)) + (newColor.blue * 0.6)).toInt();
+
+        // Certifica-se de que os valores de r, g e b estejam dentro do intervalo [0, 255]
+        r = r.clamp(0, 255);
+        g = g.clamp(0, 255);
+        b = b.clamp(0, 255);
+
+        // Define o novo pixel
+        image.setPixel(x, y, img.ColorRgb8(r, g, b));
+      }
+    }
+  }
+
+  return Uint8List.fromList(img.encodePng(image));
+}
+
+static bool _isHairPixel(img.Pixel pixel) {
+  // Garantir que r, g e b sejam int
+  int r = pixel.r.toInt();
+  int g = pixel.g.toInt();
+  int b = pixel.b.toInt();
+
+  // Calculando a luminosidade do pixel
+  double luminosity = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+  // Definir uma faixa para identificar cabelo escuro, ajustando para os valores de luminosidade e cores
+  bool isDarkHair = luminosity < 80;  // Valor ajustável, indicando pixel escuro
+  bool isColorInHairRange = (r < 70 && g < 60 && b < 50); // Faixa de cores específicas
+
+  // O pixel será considerado cabelo se atender a uma das duas condições
+  return isDarkHair || isColorInHairRange;
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +170,7 @@ class _EditDialogState extends State<EditDialog> {
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
                   constraints: BoxConstraints(
-                    maxHeight: 450,
+                    maxHeight: 380,
                     maxWidth: 400,
                   ),
                   child: Stack(
@@ -223,7 +292,8 @@ class _EditDialogState extends State<EditDialog> {
                     : _selectedOption == 'colors'
                         ? SingleChildScrollView(
                             child: Center(
-                              child: ColorPickerScreen(),
+                              child: ColorPickerScreen(
+                                  onColorSlected: _onColorSelected),
                             ),
                           )
                         : Center(
