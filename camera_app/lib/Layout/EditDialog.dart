@@ -11,7 +11,7 @@ import 'ColorPicker.dart';
 class EditDialog extends StatefulWidget {
   final File image; // Imagem original
   final ui.Image? processedImage; // Imagem processada (pode ser null)
-
+  
   EditDialog({
     required this.image,
     this.processedImage,
@@ -28,10 +28,11 @@ class _EditDialogState extends State<EditDialog> {
   bool isLoading = false;
   String _selectedOption = 'Select Hair';
   Color _selectedColor = Colors.black;
-
+  
   @override
   void initState() {
     super.initState();
+    
     processedImage = widget.processedImage;
     if (processedImage != null) {
       _convertImageToBytes(processedImage!);
@@ -105,7 +106,7 @@ class _EditDialogState extends State<EditDialog> {
   // Ajuste do centro e das dimensões da elipse
   double centerX = imageWidth / 2; // Centro da imagem (horizontal)
   double centerY = imageHeight * 0.68; // Ajustando o centro da elipse mais para baixo
-  double a = imageWidth * 0.35; // Largura da elipse (20% da largura da imagem)
+  double a = imageWidth * 0.37; // Largura da elipse (20% da largura da imagem)
   double b = imageHeight * 0.26; // Altura da elipse (40% da altura da imagem)
 
   for (int y = 0; y < imageHeight; y++) {
@@ -200,6 +201,16 @@ static bool _isHairPixel(int x, int y, int imageWidth, int imageHeight, img.Imag
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                 IconButton(
+      icon: Icon(Icons.undo, color: Colors.white), // Ícone de desfazer
+      onPressed: () {
+        setState(() {
+          // Restaure a imagem original ou limpe as alterações, por exemplo:
+          processedImageBytes = null; // Aqui você pode resetar as alterações
+        });
+        print('Desfazer clicado');
+      },
+    ),
                 TextButton(
                   onPressed: () async {
                     if (processedImageBytes != null) {
@@ -216,6 +227,7 @@ static bool _isHairPixel(int x, int y, int imageWidth, int imageHeight, img.Imag
                   },
                   child: const Text('Save'),
                 ),
+                
               ],
             ),
             Center(
