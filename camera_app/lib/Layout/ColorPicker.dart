@@ -34,7 +34,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
             indicatorBorderRadius:
                 const BorderRadius.vertical(top: Radius.circular(25)),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 1),
           ElevatedButton(
             onPressed: (){
               // print('Cor Aceita: $_currentColor');
