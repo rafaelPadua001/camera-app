@@ -11,7 +11,7 @@ import 'ColorPicker.dart';
 class EditDialog extends StatefulWidget {
   final File image; // Imagem original
   final ui.Image? processedImage; // Imagem processada (pode ser null)
-  
+
   EditDialog({
     required this.image,
     this.processedImage,
@@ -28,11 +28,11 @@ class _EditDialogState extends State<EditDialog> {
   bool isLoading = false;
   String _selectedOption = 'Select Hair';
   Color _selectedColor = Colors.black;
-  
+
   @override
   void initState() {
     super.initState();
-    
+
     processedImage = widget.processedImage;
     if (processedImage != null) {
       _convertImageToBytes(processedImage!);
@@ -94,86 +94,95 @@ class _EditDialogState extends State<EditDialog> {
     return Uint8List.fromList(img.encodePng(resizedImage));
   }
 
- static Uint8List _changeHairColor(Uint8List imageBytes, Color newColor) {
-  img.Image? image = img.decodeImage(imageBytes);
-  if (image == null) {
-    throw Exception('Erro ao decodificar a imagem');
-  }
+  static Uint8List _changeHairColor(Uint8List imageBytes, Color newColor) {
+    img.Image? image = img.decodeImage(imageBytes);
+    if (image == null) {
+      throw Exception('Erro ao decodificar a imagem');
+    }
 
-  int imageHeight = image.height;
-  int imageWidth = image.width;
+    int imageHeight = image.height;
+    int imageWidth = image.width;
 
-  // Ajuste do centro e das dimensões da elipse
-  double centerX = imageWidth / 2; // Centro da imagem (horizontal)
-  double centerY = imageHeight * 0.68; // Ajustando o centro da elipse mais para baixo
-  double a = imageWidth * 0.37; // Largura da elipse (20% da largura da imagem)
-  double b = imageHeight * 0.26; // Altura da elipse (40% da altura da imagem)
+    // Ajuste do centro e das dimensões da elipse
+    double centerX = imageWidth / 2; // Centro da imagem (horizontal)
+    double centerY =
+        imageHeight * 0.68; // Ajustando o centro da elipse mais para baixo
+    double a =
+        imageWidth * 0.37; // Largura da elipse (20% da largura da imagem)
+    double b = imageHeight * 0.26; // Altura da elipse (40% da altura da imagem)
 
-  for (int y = 0; y < imageHeight; y++) {
-    for (int x = 0; x < imageWidth; x++) {
-      img.Pixel pixel = image.getPixel(x, y);
+    for (int y = 0; y < imageHeight; y++) {
+      for (int x = 0; x < imageWidth; x++) {
+        img.Pixel pixel = image.getPixel(x, y);
 
-      // Verificar se o pixel está fora da área da elipse
-      if (!_isInFaceEllipse(x, y, centerX, centerY, a, b)) {
-        // Se o pixel estiver fora da elipse, aplicar a coloração do cabelo
-        if (_isHairPixel(x, y, imageWidth, imageHeight, image)) {
-          double originalR = pixel.r / 255.0;
-          double originalG = pixel.g / 255.0;
-          double originalB = pixel.b / 255.0;
+        // Verificar se o pixel está fora da área da elipse
+        if (!_isInFaceEllipse(x, y, centerX, centerY, a, b)) {
+          // Se o pixel estiver fora da elipse, aplicar a coloração do cabelo
+          if (_isHairPixel(x, y, imageWidth, imageHeight, image)) {
+            double originalR = pixel.r / 255.0;
+            double originalG = pixel.g / 255.0;
+            double originalB = pixel.b / 255.0;
 
-          double luminance = 0.299 * originalR + 0.587 * originalG + 0.114 * originalB;
+            double luminance =
+                0.299 * originalR + 0.587 * originalG + 0.114 * originalB;
 
-          double brightnessFactor = luminance < 0.2 ? 1.15 : 1.0;
-          originalR = (originalR * brightnessFactor).clamp(0, 1);
-          originalG = (originalG * brightnessFactor).clamp(0, 1);
-          originalB = (originalB * brightnessFactor).clamp(0, 1);
+            double brightnessFactor = luminance < 0.2 ? 1.15 : 1.0;
+            originalR = (originalR * brightnessFactor).clamp(0, 1);
+            originalG = (originalG * brightnessFactor).clamp(0, 1);
+            originalB = (originalB * brightnessFactor).clamp(0, 1);
 
-          double blendFactor = 0.4;
-          int r = ((newColor.red * blendFactor) + (originalR * 255 * (1 - blendFactor))).toInt();
-          int g = ((newColor.green * blendFactor) + (originalG * 255 * (1 - blendFactor))).toInt();
-          int b = ((newColor.blue * blendFactor) + (originalB * 255 * (1 - blendFactor))).toInt();
+            double blendFactor = 0.4;
+            int r = ((newColor.red * blendFactor) +
+                    (originalR * 255 * (1 - blendFactor)))
+                .toInt();
+            int g = ((newColor.green * blendFactor) +
+                    (originalG * 255 * (1 - blendFactor)))
+                .toInt();
+            int b = ((newColor.blue * blendFactor) +
+                    (originalB * 255 * (1 - blendFactor)))
+                .toInt();
 
-          if (luminance < 0.2) {
-            r = (r * 1.05).clamp(0, 255).toInt();
-            g = (g * 1.05).clamp(0, 255).toInt();
-            b = (b * 1.05).clamp(0, 255).toInt();
+            if (luminance < 0.2) {
+              r = (r * 1.05).clamp(0, 255).toInt();
+              g = (g * 1.05).clamp(0, 255).toInt();
+              b = (b * 1.05).clamp(0, 255).toInt();
+            }
+
+            image.setPixel(x, y, img.ColorRgb8(r, g, b));
           }
-
-          image.setPixel(x, y, img.ColorRgb8(r, g, b));
         }
       }
     }
+
+    return Uint8List.fromList(img.encodePng(image));
   }
 
-  return Uint8List.fromList(img.encodePng(image));
-}
+  static bool _isInFaceEllipse(
+      int x, int y, double centerX, double centerY, double a, double b) {
+    // Verifica se o pixel está dentro da elipse
+    double dx = x - centerX;
+    double dy = y - centerY;
 
-static bool _isInFaceEllipse(int x, int y, double centerX, double centerY, double a, double b) {
-  // Verifica se o pixel está dentro da elipse
-  double dx = x - centerX;
-  double dy = y - centerY;
+    return (dx * dx) / (a * a) + (dy * dy) / (b * b) <= 1;
+  }
 
-  return (dx * dx) / (a * a) + (dy * dy) / (b * b) <= 1;
-}
+  static bool _isHairPixel(
+      int x, int y, int imageWidth, int imageHeight, img.Image image) {
+    img.Pixel pixel = image.getPixel(x, y);
+    int r = pixel.r.toInt();
+    int g = pixel.g.toInt();
+    int b = pixel.b.toInt();
 
-static bool _isHairPixel(int x, int y, int imageWidth, int imageHeight, img.Image image) {
-  img.Pixel pixel = image.getPixel(x, y);
-  int r = pixel.r.toInt();
-  int g = pixel.g.toInt();
-  int b = pixel.b.toInt();
+    // Calculando luminosidade
+    double luminosity = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-  // Calculando luminosidade
-  double luminosity = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    // Condição de detecção para cabelos escuros ou dentro da faixa de cor do cabelo
+    bool isDarkHair = luminosity < 90;
+    bool isColorInHairRange = (r < 85 && g < 75 && b < 65);
 
-  // Condição de detecção para cabelos escuros ou dentro da faixa de cor do cabelo
-  bool isDarkHair = luminosity < 90;
-  bool isColorInHairRange = (r < 85 && g < 75 && b < 65);
-
-  // Verifica se o pixel está dentro da faixa de cabelo (fora da elipse)
-  return (isDarkHair || isColorInHairRange);
-}
-
-
+    // Verifica se o pixel está dentro da faixa de cabelo (fora da elipse)
+    return (isDarkHair || isColorInHairRange);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -201,17 +210,19 @@ static bool _isHairPixel(int x, int y, int imageWidth, int imageHeight, img.Imag
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                 IconButton(
-      icon: Icon(Icons.undo, color: Colors.white), // Ícone de desfazer
-      onPressed: () {
-        setState(() {
-          // Restaure a imagem original ou limpe as alterações, por exemplo:
-          processedImageBytes = null; // Aqui você pode resetar as alterações
-        });
-        print('Desfazer clicado');
-      },
-    ),
-                TextButton(
+                IconButton(
+                  icon: Icon(Icons.undo,
+                      color: Colors.white), // Ícone de desfazer
+                  onPressed: () {
+                    setState(() {
+                      // Restaure a imagem original ou limpe as alterações, por exemplo:
+                      processedImageBytes =
+                          null; // Aqui você pode resetar as alterações
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: Icon(Icons.done, color: Colors.white),
                   onPressed: () async {
                     if (processedImageBytes != null) {
                       await _saveImageToCache(processedImageBytes!);
@@ -225,9 +236,7 @@ static bool _isHairPixel(int x, int y, int imageWidth, int imageHeight, img.Imag
                       );
                     }
                   },
-                  child: const Text('Save'),
                 ),
-                
               ],
             ),
             Center(
@@ -316,7 +325,10 @@ static bool _isHairPixel(int x, int y, int imageWidth, int imageHeight, img.Imag
                         label: Text('Colors'),
                         icon: Icon(Icons.color_lens),
                       ),
-                      ButtonSegment<String>(value: 'cut', label: Text('Cut')),
+                      ButtonSegment<String>(
+                          value: 'filters',
+                          label: Text('Filters'),
+                          icon: Icon(Icons.tune)),
                     ],
                     selected: <String>{_selectedOption},
                     onSelectionChanged: (Set<String> newSelection) {
@@ -402,9 +414,8 @@ static bool _isHairPixel(int x, int y, int imageWidth, int imageHeight, img.Imag
                             ),
                           )
                         : Center(
-                            child: Text('Cut option selected'),
+                            child: Text('Filter option selected'),
                           )),
-            
           ],
         ),
       ),
