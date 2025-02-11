@@ -93,6 +93,24 @@ class _GaleryState extends State<Galery> {
           child: Wrap(
             children: <Widget>[
               ListTile(
+                leading: Icon(Icons.edit),
+                title: Text('Edit'),
+                onTap: () {
+                  Navigator.pop(context); // Fecha o menu
+                  _showEditDialog(
+                      context, _images[index], processedImage, index);
+                  // Adicione a funcionalidade de mostrar informações sobre a imagem aqui
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.delete),
+                title: Text('Remove'),
+                onTap: () {
+                  Navigator.pop(context); // Fecha o menu
+                  _showRemoveDialog(context, _images[index], index);
+                },
+              ),
+              ListTile(
                 leading: Icon(Icons.share),
                 title: Text('Share'),
                 onTap: () {
@@ -130,24 +148,7 @@ class _GaleryState extends State<Galery> {
                   // Adicione a funcionalidade de compartilhamento aqui
                 },
               ),
-              ListTile(
-                leading: Icon(Icons.edit),
-                title: Text('Edit'),
-                onTap: () {
-                  Navigator.pop(context); // Fecha o menu
-                  _showEditDialog(
-                      context, _images[index], processedImage, index);
-                  // Adicione a funcionalidade de mostrar informações sobre a imagem aqui
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.delete),
-                title: Text('Remove'),
-                onTap: () {
-                  Navigator.pop(context); // Fecha o menu
-                  _showRemoveDialog(context, _images[index], index);
-                },
-              ),
+             
               ListTile(
                 leading: Icon(Icons.info),
                 title: Text('Properties'),
