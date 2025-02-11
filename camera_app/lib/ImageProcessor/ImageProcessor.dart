@@ -41,7 +41,7 @@ class ImageProcessor {
     // Redimensionar máscara
     final resizedMask = _resizeMaskToImageSize(
         hairMask, maskDimension, originalImage.width, originalImage.height);
-    final blurredMask = _blurMask(resizedMask, 8);
+    final blurredMask = _blurMask(resizedMask, 100);
 
     // await _saveDebugImage(resizedMask, 'debug_resized_mask.png');
 
@@ -62,8 +62,8 @@ class ImageProcessor {
     return processedImage;
   }
 
-  img.Image _blurMask(img.Image maskImage, int blurRadius) {
-    return img.gaussianBlur(maskImage, radius: blurRadius);
+  img.Image _blurMask(img.Image maskImage, int intensity) {
+    return img.smooth(maskImage, weight: intensity);
   }
 
   img.Image _resizeMaskToImageSize(
