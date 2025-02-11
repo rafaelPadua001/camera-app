@@ -38,23 +38,23 @@ class _EditDialogState extends State<EditDialog> {
     }
   }
 
- void _onColorSelected(Color color) {
-  setState(() {
-    _selectedColor = color;
-  });
-
-  if (processedImageBytes != null ) {
-    // Altera cor do cabelo da imagem
-    Uint8List newImageBytes = _changeHairColor(
-      processedImageBytes!,  // Imagem original
-      _selectedColor         // Cor selecionada
-    );
-
+  void _onColorSelected(Color color) {
     setState(() {
-      processedImageBytes = newImageBytes;
+      _selectedColor = color;
     });
+
+    if (processedImageBytes != null) {
+      // Altera cor do cabelo da imagem
+      Uint8List newImageBytes = _changeHairColor(
+          processedImageBytes!, // Imagem original
+          _selectedColor // Cor selecionada
+          );
+
+      setState(() {
+        processedImageBytes = newImageBytes;
+      });
+    }
   }
-}
 
   Future<void> _convertImageToBytes(ui.Image image) async {
     try {
@@ -92,30 +92,54 @@ class _EditDialogState extends State<EditDialog> {
         img.copyResize(image, width: width, height: height);
     return Uint8List.fromList(img.encodePng(resizedImage));
   }
-  
-static Uint8List _changeHairColor(Uint8List imageBytes, Color newColor) {
+
+ static Uint8List _changeHairColor(Uint8List imageBytes, Color newColor) {
   img.Image? image = img.decodeImage(imageBytes);
   if (image == null) {
     throw Exception('Erro ao decodificar a imagem');
   }
 
-  for (int y = 0; y < image.height; y++) {
-    for (int x = 0; x < image.width; x++) {
+  int imageHeight = image.height;
+  int imageWidth = image.width;
+
+  // Ajuste do centro e das dimensões da elipse
+  double centerX = imageWidth / 2; // Centro da imagem (horizontal)
+  double centerY = imageHeight * 0.68; // Ajustando o centro da elipse mais para baixo
+  double a = imageWidth * 0.35; // Largura da elipse (20% da largura da imagem)
+  double b = imageHeight * 0.26; // Altura da elipse (40% da altura da imagem)
+
+  for (int y = 0; y < imageHeight; y++) {
+    for (int x = 0; x < imageWidth; x++) {
       img.Pixel pixel = image.getPixel(x, y);
 
-      if (_isHairPixel(pixel)) {
-        // Altera a cor do cabelo para a cor selecionada
-        int r = ((pixel.r * (1 - 0.6)) + (newColor.red * 0.6)).toInt();
-        int g = ((pixel.g * (1 - 0.6)) + (newColor.green * 0.6)).toInt();
-        int b = ((pixel.b * (1 - 0.6)) + (newColor.blue * 0.6)).toInt();
+      // Verificar se o pixel está fora da área da elipse
+      if (!_isInFaceEllipse(x, y, centerX, centerY, a, b)) {
+        // Se o pixel estiver fora da elipse, aplicar a coloração do cabelo
+        if (_isHairPixel(x, y, imageWidth, imageHeight, image)) {
+          double originalR = pixel.r / 255.0;
+          double originalG = pixel.g / 255.0;
+          double originalB = pixel.b / 255.0;
 
-        // Certifica-se de que os valores de r, g e b estejam dentro do intervalo [0, 255]
-        r = r.clamp(0, 255);
-        g = g.clamp(0, 255);
-        b = b.clamp(0, 255);
+          double luminance = 0.299 * originalR + 0.587 * originalG + 0.114 * originalB;
 
-        // Define o novo pixel
-        image.setPixel(x, y, img.ColorRgb8(r, g, b));
+          double brightnessFactor = luminance < 0.2 ? 1.15 : 1.0;
+          originalR = (originalR * brightnessFactor).clamp(0, 1);
+          originalG = (originalG * brightnessFactor).clamp(0, 1);
+          originalB = (originalB * brightnessFactor).clamp(0, 1);
+
+          double blendFactor = 0.4;
+          int r = ((newColor.red * blendFactor) + (originalR * 255 * (1 - blendFactor))).toInt();
+          int g = ((newColor.green * blendFactor) + (originalG * 255 * (1 - blendFactor))).toInt();
+          int b = ((newColor.blue * blendFactor) + (originalB * 255 * (1 - blendFactor))).toInt();
+
+          if (luminance < 0.2) {
+            r = (r * 1.05).clamp(0, 255).toInt();
+            g = (g * 1.05).clamp(0, 255).toInt();
+            b = (b * 1.05).clamp(0, 255).toInt();
+          }
+
+          image.setPixel(x, y, img.ColorRgb8(r, g, b));
+        }
       }
     }
   }
@@ -123,22 +147,31 @@ static Uint8List _changeHairColor(Uint8List imageBytes, Color newColor) {
   return Uint8List.fromList(img.encodePng(image));
 }
 
-static bool _isHairPixel(img.Pixel pixel) {
-  // Garantir que r, g e b sejam int
+static bool _isInFaceEllipse(int x, int y, double centerX, double centerY, double a, double b) {
+  // Verifica se o pixel está dentro da elipse
+  double dx = x - centerX;
+  double dy = y - centerY;
+
+  return (dx * dx) / (a * a) + (dy * dy) / (b * b) <= 1;
+}
+
+static bool _isHairPixel(int x, int y, int imageWidth, int imageHeight, img.Image image) {
+  img.Pixel pixel = image.getPixel(x, y);
   int r = pixel.r.toInt();
   int g = pixel.g.toInt();
   int b = pixel.b.toInt();
 
-  // Calculando a luminosidade do pixel
+  // Calculando luminosidade
   double luminosity = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-  // Definir uma faixa para identificar cabelo escuro, ajustando para os valores de luminosidade e cores
-  bool isDarkHair = luminosity < 80;  // Valor ajustável, indicando pixel escuro
-  bool isColorInHairRange = (r < 70 && g < 60 && b < 50); // Faixa de cores específicas
+  // Condição de detecção para cabelos escuros ou dentro da faixa de cor do cabelo
+  bool isDarkHair = luminosity < 90;
+  bool isColorInHairRange = (r < 85 && g < 75 && b < 65);
 
-  // O pixel será considerado cabelo se atender a uma das duas condições
-  return isDarkHair || isColorInHairRange;
+  // Verifica se o pixel está dentro da faixa de cabelo (fora da elipse)
+  return (isDarkHair || isColorInHairRange);
 }
+
 
 
   @override
@@ -164,13 +197,33 @@ static bool _isHairPixel(img.Pixel pixel) {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () async {
+                    if (processedImageBytes != null) {
+                      await _saveImageToCache(processedImageBytes!);
+                      Navigator.pop(context, true);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content:
+                              Text('Nenhuma imagem processada disponível.'),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            ),
             Center(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
                   constraints: BoxConstraints(
-                    maxHeight: 380,
+                    maxHeight: 280,
                     maxWidth: 400,
                   ),
                   child: Stack(
@@ -190,6 +243,46 @@ static bool _isHairPixel(img.Pixel pixel) {
                           valueColor:
                               AlwaysStoppedAnimation<Color>(Colors.blueAccent),
                         ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: GestureDetector(
+                          onTap: () {
+                            print('Close image clicked');
+                            Navigator.of(context).pop();
+                          },
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                padding: EdgeInsets.all(0.6),
+                                child: Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                              // SizedBox(width: 8,),
+                              // Container(
+                              //  decoration: BoxDecoration(
+                              //   color: Colors.black.withOpacity(0.5),
+                              //   shape: BoxShape.circle,
+                              //  ),
+                              //   padding: EdgeInsets.all(0.6),
+                              //   child: Icon(
+                              //     Icons.check,
+                              //     color: Colors.white,
+                              //     size: 20,
+                              //   ),
+                              // ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -299,34 +392,7 @@ static bool _isHairPixel(img.Pixel pixel) {
                         : Center(
                             child: Text('Cut option selected'),
                           )),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Close'),
-                ),
-                SizedBox(width: 8),
-                TextButton(
-                  onPressed: () async {
-                    if (processedImageBytes != null) {
-                      await _saveImageToCache(processedImageBytes!);
-                      Navigator.pop(context, true);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content:
-                              Text('Nenhuma imagem processada disponível.'),
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            ),
+            
           ],
         ),
       ),
