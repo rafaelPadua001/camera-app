@@ -106,10 +106,10 @@ class _EditDialogState extends State<EditDialog> {
     // Ajuste do centro e das dimensões da elipse
     double centerX = imageWidth / 2; // Centro da imagem (horizontal)
     double centerY =
-        imageHeight * 0.68; // Ajustando o centro da elipse mais para baixo
+        imageHeight * 0.76; // Ajustando o centro da elipse mais para baixo
     double a =
-        imageWidth * 0.37; // Largura da elipse (20% da largura da imagem)
-    double b = imageHeight * 0.26; // Altura da elipse (40% da altura da imagem)
+        imageWidth * 0.99; // Largura da elipse (20% da largura da imagem)
+    double b = imageHeight * 0.33; // Altura da elipse (40% da altura da imagem)
 
     for (int y = 0; y < imageHeight; y++) {
       for (int x = 0; x < imageWidth; x++) {
