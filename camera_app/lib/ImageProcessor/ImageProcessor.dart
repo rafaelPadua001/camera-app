@@ -108,7 +108,7 @@ class ImageProcessor {
   Uint8List hairImageBytes, {
   required List<int> hairMask,
   int maskMargin = 0,
-  double scale = 0.7,
+  double scale = 0.65,
 }) {
   final hairImage = img.decodeImage(hairImageBytes);
   if (hairImage == null) {
