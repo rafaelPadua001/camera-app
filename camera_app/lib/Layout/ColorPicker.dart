@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class ColorPickerScreen extends StatefulWidget {
-  final Function(Color) onColorSlected;
+  final Function(Color) onColorSelected;
 
-  const ColorPickerScreen({Key? key, required this.onColorSlected}) : super(key: key);
+  const ColorPickerScreen({Key? key, required this.onColorSelected})
+      : super(key: key);
 
   @override
   _ColorPickerScreenState createState() => _ColorPickerScreenState();
@@ -36,10 +37,9 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
           ),
           const SizedBox(height: 1),
           ElevatedButton(
-            onPressed: (){
+            onPressed: () {
               // print('Cor Aceita: $_currentColor');
-              widget.onColorSlected(_currentColor);
-
+              widget.onColorSelected(_currentColor);
             },
             child: const Text('Confirm'),
           ),

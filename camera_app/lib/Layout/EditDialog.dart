@@ -2,6 +2,7 @@ import 'dart:ffi';
 import 'dart:typed_data';
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:camera_app/Layout/PhotoFilters.dart';
 import 'package:flutter/material.dart';
 import 'EditCarouselOptions.dart';
 import 'package:path_provider/path_provider.dart';
@@ -106,10 +107,10 @@ class _EditDialogState extends State<EditDialog> {
     // Ajuste do centro e das dimensões da elipse
     double centerX = imageWidth / 2; // Centro da imagem (horizontal)
     double centerY =
-        imageHeight * 0.76; // Ajustando o centro da elipse mais para baixo
+        imageHeight * 0.75; // Ajustando o centro da elipse mais para baixo
     double a =
-        imageWidth * 0.99; // Largura da elipse (20% da largura da imagem)
-    double b = imageHeight * 0.33; // Altura da elipse (40% da altura da imagem)
+        imageWidth * 0.98; // Largura da elipse (20% da largura da imagem)
+    double b = imageHeight * 0.34; // Altura da elipse (40% da altura da imagem)
 
     for (int y = 0; y < imageHeight; y++) {
       for (int x = 0; x < imageWidth; x++) {
@@ -410,11 +411,11 @@ class _EditDialogState extends State<EditDialog> {
                         ? SingleChildScrollView(
                             child: Center(
                               child: ColorPickerScreen(
-                                  onColorSlected: _onColorSelected),
+                                  onColorSelected: _onColorSelected),
                             ),
                           )
                         : Center(
-                            child: Text('Filter option selected'),
+                            child: FilteredImageWidget(),
                           )),
           ],
         ),
