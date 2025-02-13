@@ -8,6 +8,8 @@ import 'EditCarouselOptions.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img; // Para manipulação de imagens
 import 'ColorPicker.dart';
+import 'package:flutter/foundation.dart';
+
 
 class EditDialog extends StatefulWidget {
   final File image; // Imagem original
@@ -58,6 +60,29 @@ class _EditDialogState extends State<EditDialog> {
     }
   }
 
+void _applyBrightnessFilter({double brightness = 1.0}) async {
+  if (widget.image == null || !await widget.image.exists()) {
+    return;
+  }
+
+  Uint8List imageBytes = await widget.image.readAsBytes();
+  double adjustedBrightness = brightness.clamp(0.1, 1.0);
+
+  // Processando em um isolate sem objetos complexos
+  Uint8List? updatedBytes = await compute(
+    processImageInBackground,
+    [imageBytes, adjustedBrightness], // Usar uma lista ao invés de map
+  );
+
+  if (updatedBytes != null && mounted) {
+    setState(() {
+      processedImageBytes = updatedBytes;
+    });
+  }
+}
+
+
+
   Future<void> _convertImageToBytes(ui.Image image) async {
     try {
       ByteData? byteData =
@@ -85,6 +110,20 @@ class _EditDialogState extends State<EditDialog> {
     }
   }
 
+// Uint8List? processImageInBackground(List<dynamic> params) {
+//   Uint8List imageBytes = params[0] as Uint8List;
+//   double brightness = params[1] as double;
+
+//   // Decodificar a imagem
+//   img.Image? image = img.decodeImage(imageBytes);
+//   if (image == null) return null;
+
+//   // Ajustar brilho
+//   img.Image adjustedImage = img.adjustColor(image, brightness: brightness);
+
+//   // Retornar bytes da imagem processada
+//   return Uint8List.fromList(img.encodePng(adjustedImage));
+// }
   Uint8List _resizeImage(Uint8List imageBytes, int width, int height) {
     img.Image? image = img.decodeImage(imageBytes);
     if (image == null) {
@@ -383,26 +422,26 @@ class _EditDialogState extends State<EditDialog> {
                               isLoading = false;
                             });
                             return;
-                          } else {
-                            await _convertImageToBytes(newImage);
-                            if (processedImageBytes != null) {
-                              try {
-                                Uint8List resizedImageBytes = _resizeImage(
-                                  processedImageBytes!,
-                                  600,
-                                  800,
-                                );
-                                setState(() {
-                                  processedImageBytes = resizedImageBytes;
-                                  processedImage = newImage;
-                                  isLoading = false;
-                                });
-                              } catch (e) {
-                                print('Erro ao redimensionar a imagem: $e');
-                                setState(() {
-                                  isLoading = false;
-                                });
-                              }
+                          }
+                          await _convertImageToBytes(newImage);
+
+                          if (processedImageBytes != null) {
+                            try {
+                              Uint8List resizedImageBytes = _resizeImage(
+                                processedImageBytes!,
+                                600,
+                                800,
+                              );
+                              setState(() {
+                                processedImageBytes = resizedImageBytes;
+                                processedImage = newImage;
+                                isLoading = false;
+                              });
+                            } catch (e) {
+                              print('Erro ao redimensionar a imagem: $e');
+                              setState(() {
+                                isLoading = false;
+                              });
                             }
                           }
                         },
@@ -415,11 +454,33 @@ class _EditDialogState extends State<EditDialog> {
                             ),
                           )
                         : Center(
-                            child: FilteredImageWidget(),
+                            child: FilteredImageWidget(
+                              originalImage: widget.image,
+                              processedImage: processedImageBytes,
+                              onFilterChanged: (double brightness) {
+                                _applyBrightnessFilter(brightness: brightness);
+                              },
+                            ),
                           )),
           ],
         ),
       ),
     );
   }
+}
+
+
+Uint8List? processImageInBackground(List<dynamic> params) {
+  Uint8List imageBytes = params[0] as Uint8List;
+  double brightness = params[1] as double;
+
+  // Decodificar a imagem
+  img.Image? image = img.decodeImage(imageBytes);
+  if (image == null) return null;
+
+  // Ajustar brilho
+  img.Image adjustedImage = img.adjustColor(image, brightness: brightness);
+
+  // Retornar bytes da imagem processada
+  return Uint8List.fromList(img.encodePng(adjustedImage));
 }
