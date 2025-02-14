@@ -12,14 +12,16 @@ class FilteredImageWidget extends StatefulWidget {
   final Function(double) onExposureChanged;
   final Function(double) onHueChanged;
 
-  const FilteredImageWidget(
-      {required this.originalImage,
-      this.processedImage,
-      required this.onFilterChanged,
-      required this.onContrastChanged,
-      required this.onSaturationChanged,
-      required this.onExposureChanged,
-      required this.onHueChanged});
+  const FilteredImageWidget({
+    required this.originalImage,
+    this.processedImage,
+    required this.onFilterChanged,
+    required this.onContrastChanged,
+    required this.onSaturationChanged,
+    required this.onExposureChanged,
+    required this.onHueChanged,
+    // required this.onTemperatureChanged
+  });
 
   @override
   _FilteredImageWidgetState createState() => _FilteredImageWidgetState();
@@ -31,6 +33,7 @@ class _FilteredImageWidgetState extends State<FilteredImageWidget> {
   double _saturation = 0.0;
   double _exposure = 0.0;
   double _hue = 0.0;
+  // double _temperature = 0.0;
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +106,9 @@ class _FilteredImageWidgetState extends State<FilteredImageWidget> {
                 Slider(
                     value: _saturation,
                     label: _saturation.toStringAsFixed(2),
+                    min: -1.0,
+                    max: 1.0,
+                    divisions: 20,
                     onChanged: (double value) {
                       setState(() {
                         //_currentSliderThirdValue = value;
@@ -122,6 +128,9 @@ class _FilteredImageWidgetState extends State<FilteredImageWidget> {
                 Slider(
                     value: _exposure,
                     label: _exposure.toStringAsFixed(2),
+                    min: -1.0,
+                    max: 1.0,
+                    divisions: 20,
                     onChanged: (double value) {
                       setState(() {
                         //_currentSliderThirdValue = value;
@@ -141,6 +150,9 @@ class _FilteredImageWidgetState extends State<FilteredImageWidget> {
                 Slider(
                     value: _hue,
                     label: _hue.toStringAsFixed(2),
+                    min: -1.0,
+                    max: 1.0,
+                    divisions: 20,
                     onChanged: (double value) {
                       setState(() {
                         //_currentSliderThirdValue = value;
@@ -150,6 +162,25 @@ class _FilteredImageWidgetState extends State<FilteredImageWidget> {
                     onChangeEnd: (double value) {
                       widget.onHueChanged(value);
                     }),
+                //  Text(
+                //   'Temerature:',
+                //   style: TextStyle(
+                //     fontSize: 12,
+                //     fontWeight: FontWeight.bold,
+                //   ),
+                // ),
+                // Slider(
+                //     value: _temperature,
+                //     label: _temperature.toStringAsFixed(2),
+                //     onChanged: (double value) {
+                //       setState(() {
+                //         //_currentSliderThirdValue = value;
+                //         _temperature = value;
+                //       });
+                //     },
+                //     onChangeEnd: (double value) {
+                //       widget.onTemperatureChanged(value);
+                //     }),
               ],
             )),
           ),
