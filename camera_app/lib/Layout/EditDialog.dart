@@ -10,11 +10,10 @@ import 'package:image/image.dart' as img; // Para manipulação de imagens
 import 'ColorPicker.dart';
 import 'package:flutter/foundation.dart';
 
-
 class EditDialog extends StatefulWidget {
   final File image; // Imagem original
   final ui.Image? processedImage; // Imagem processada (pode ser null)
- 
+
   EditDialog({
     required this.image,
     this.processedImage,
@@ -24,12 +23,10 @@ class EditDialog extends StatefulWidget {
   _EditDialogState createState() => _EditDialogState();
 }
 
-
-
 Uint8List? _processImageInBackground(List<Object> params) {
   Uint8List imageBytes = params[0] as Uint8List;
   double brightness = params[1] as double;
- 
+
   img.Image? image = img.decodeImage(imageBytes);
   if (image == null) return null;
 
@@ -41,14 +38,50 @@ Uint8List? _processImageInBackground(List<Object> params) {
   return Uint8List.fromList(img.encodePng(adjustedImage));
 }
 
-Uint8List? _processImageContrastBackground(List<dynamic> params){
+Uint8List? _processImageContrastBackground(List<dynamic> params) {
   Uint8List imageBytes = params[0] as Uint8List;
   double contrastValue = params[1] as double;
 
   img.Image? image = img.decodeImage(imageBytes);
-  if(image == null) return null;
+  if (image == null) return null;
 
   img.Image adjustedImage = img.adjustColor(image, contrast: contrastValue);
+
+  return Uint8List.fromList(img.encodePng(adjustedImage));
+}
+
+Uint8List? _processImageSaturarionBackground(List<dynamic> params) {
+  Uint8List imageBytes = params[0] as Uint8List;
+  double saturationValue = params[1] as double;
+
+  img.Image? image = img.decodeImage(imageBytes);
+  if (image == null) return null;
+
+  img.Image adjustedImage = img.adjustColor(image, saturation: saturationValue);
+
+  return Uint8List.fromList(img.encodePng(adjustedImage));
+}
+
+Uint8List? _processImageExposureBackground(List<dynamic> params) {
+  Uint8List imageBytes = params[0] as Uint8List;
+  double exposureValue = params[1] as double;
+
+  img.Image? image = img.decodeImage(imageBytes);
+  if (image == null) return null;
+
+  img.Image adjustedImage = img.adjustColor(image, exposure: exposureValue);
+
+  return Uint8List.fromList(img.encodePng(adjustedImage));
+}
+
+Uint8List? _processImageHueBackground(List<dynamic> params) {
+  Uint8List imageBytes = params[0] as Uint8List;
+  double hueValue = params[1] as double;
+
+  img.Image? image = img.decodeImage(imageBytes);
+  if (image == null) return null;
+
+  img.Image adjustedImage = img.adjustColor(image, hue: hueValue);
 
   return Uint8List.fromList(img.encodePng(adjustedImage));
 }
@@ -60,8 +93,8 @@ class _EditDialogState extends State<EditDialog> {
   bool isLoading = false;
   String _selectedOption = 'Select Hair';
   Color _selectedColor = Colors.black;
-   bool _isProcessing = false;
-  
+  bool _isProcessing = false;
+
   @override
   void initState() {
     super.initState();
@@ -90,63 +123,121 @@ class _EditDialogState extends State<EditDialog> {
     }
   }
 
-void _applyBrightnessFilter({double brightness = 0.0}) async {
-  if (widget.image == null || !await widget.image.exists()) {
-    return;
+  void _applyBrightnessFilter({double brightness = 0.0}) async {
+    if (widget.image == null || !await widget.image.exists()) {
+      return;
+    }
+
+    setState(() => _isProcessing = true); // mostra indicador de carregamento
+
+    Uint8List imageBytes =
+        processedImageBytes ?? await widget.image.readAsBytes();
+    double adjustedBrightness = brightness;
+
+    // Processando em um isolate sem objetos complexos
+    Uint8List? updatedBytes = await compute(
+      _processImageInBackground,
+      [imageBytes, adjustedBrightness], // Usar uma lista ao invés de map
+    );
+
+    if (updatedBytes != null && mounted) {
+      setState(() {
+        processedImageBytes = updatedBytes;
+        _isProcessing = false;
+      });
+
+      // widget.onFilterChanged(updatedBytes);
+    }
   }
 
-  setState(() => _isProcessing  = true); // mostra indicador de carregamento
+  void _applyContrastFilter({double contrastValue = 0.0}) async {
+    if (widget.image == null || !await widget.image.exists()) {
+      return;
+    }
 
-  Uint8List imageBytes = await widget.image.readAsBytes();
-  double adjustedBrightness = brightness;
+    setState(() => _isProcessing = true);
+    Uint8List imageBytes =
+        processedImageBytes ?? await widget.image.readAsBytes();
+    double adjustedContrastValue = contrastValue;
 
-  // Processando em um isolate sem objetos complexos
-  Uint8List? updatedBytes = await compute(
-    _processImageInBackground,
-    [imageBytes, adjustedBrightness], // Usar uma lista ao invés de map
-  );
+    Uint8List? updatedBytes = await compute(
+      _processImageContrastBackground,
+      [imageBytes, adjustedContrastValue],
+    );
 
-  if (updatedBytes != null && mounted) {
-    setState(() {
-      processedImageBytes = updatedBytes;
-      _isProcessing = false;
-    });
-
-   // widget.onFilterChanged(updatedBytes);
-  }
-}
-
-void _applyContrastFilter({double contrastValue = 0.0}) async {
-  if(widget.image == null || !await widget.image.exists()){
-    return;
+    if (updatedBytes != null && mounted) {
+      setState(() {
+        processedImageBytes = updatedBytes;
+        _isProcessing = false;
+      });
+    }
   }
 
-  setState(() => _isProcessing = true);
-  Uint8List imageBytes = await widget.image.readAsBytes();
-  double adjustedContrastValue = contrastValue;
+  void _applySaturationFilter({double saturationValue = 0.0}) async {
+    if (widget.image == null || !await widget.image.exists()) {
+      return;
+    }
 
-  
+    setState(() => _isProcessing = true);
 
-  Uint8List? updatedBytes = await compute(
-    _processImageContrastBackground,
-    [imageBytes, adjustedContrastValue],
-  );
+    Uint8List imageBytes =
+        processedImageBytes ?? await widget.image.readAsBytes();
+    double adjustedSaturationValue = saturationValue;
 
-  if(updatedBytes != null && mounted){
-    setState(() {
-      processedImageBytes = updatedBytes;
-      _isProcessing = false;
-    });
+    Uint8List? updateBytes = await compute(
+      _processImageSaturarionBackground,
+      [imageBytes, adjustedSaturationValue],
+    );
+
+    if (updateBytes != null && mounted) {
+      setState(() {
+        processedImageBytes = updateBytes;
+        _isProcessing = false;
+      });
+    }
   }
-}
 
-Future<Uint8List?> processImage(Uint8List imageBytes, doubleBrightness) async {
-  return await compute(_processImageInBackground, [imageBytes, Brightness]);
-}
+  void _applyExposureFilter({double exposureValue = 0.0}) async {
+    if (widget.image == null || !await widget.image.exists()) {
+      return;
+    }
 
-Future<Uint8List?> processImageContrast(Uint8List imageBytes, doubleContrastValue) async {
-  return await compute(_processImageContrastBackground, [imageBytes, doubleContrastValue]);
-}
+    setState(() => _isProcessing = true);
+
+    Uint8List imageBytes =
+        processedImageBytes ?? await widget.image.readAsBytes();
+    double adjustedExposureValue = exposureValue;
+
+    Uint8List? updateBytes = await compute(
+      _processImageExposureBackground,
+      [imageBytes, adjustedExposureValue],
+    );
+
+    if (updateBytes != null && mounted) {
+      setState(() {
+        processedImageBytes = updateBytes;
+        _isProcessing = false;
+      });
+    }
+  }
+
+  void _applyHueFilter({double hueValue = 0.0}) async {
+    Uint8List imageBytes =
+        processedImageBytes ?? await widget.image.readAsBytes();
+    double adjustedHueValue = hueValue;
+
+    Uint8List? updateBytes = await compute(
+      _processImageHueBackground,
+      [imageBytes, adjustedHueValue],
+    );
+
+    if (updateBytes != null && mounted) {
+      setState(() {
+        processedImageBytes = updateBytes;
+        _isProcessing = false;
+      });
+    }
+  }
 
   Future<void> _convertImageToBytes(ui.Image image) async {
     try {
@@ -298,37 +389,60 @@ Future<Uint8List?> processImageContrast(Uint8List imageBytes, doubleContrastValu
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.undo,
-                      color: Colors.white), // Ícone de desfazer
-                  onPressed: () {
-                    setState(() {
-                      // Restaure a imagem original ou limpe as alterações, por exemplo:
-                      processedImageBytes =
-                          null; // Aqui você pode resetar as alterações
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.done, color: Colors.white),
-                  onPressed: () async {
-                    if (processedImageBytes != null) {
-                      await _saveImageToCache(processedImageBytes!);
-                      Navigator.pop(context, true);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content:
-                              Text('Nenhuma imagem processada disponível.'),
-                        ),
-                      );
-                    }
-                  },
-                ),
-              ],
+            SizedBox(
+              height: 45,
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: 0,
+                    left: 8,
+                    child: IconButton(
+                      icon: Icon(Icons.close, color: Colors.white),
+                      padding:
+                          EdgeInsets.zero, // Remove o padding interno padrão
+                      constraints:
+                          BoxConstraints(), // Remove restrições desnecessárias
+                      onPressed: () {
+                        print('Close image clicked');
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    right: 8,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      IconButton(
+                        icon: Icon(Icons.undo,
+                            color: Colors.white), // Ícone de desfazer
+                        onPressed: () {
+                          setState(() {
+                            // Restaure a imagem original ou limpe as alterações, por exemplo:
+                            processedImageBytes =
+                                null; // Aqui você pode resetar as alterações
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.done, color: Colors.white),
+                        onPressed: () async {
+                          if (processedImageBytes != null) {
+                            await _saveImageToCache(processedImageBytes!);
+                            Navigator.pop(context, true);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    'Nenhuma imagem processada disponível.'),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ]),
+                  ),
+                ],
+              ),
             ),
             Center(
               child: ClipRRect(
@@ -355,52 +469,11 @@ Future<Uint8List?> processImageContrast(Uint8List imageBytes, doubleContrastValu
                           valueColor:
                               AlwaysStoppedAnimation<Color>(Colors.blueAccent),
                         ),
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: GestureDetector(
-                          onTap: () {
-                            print('Close image clicked');
-                            Navigator.of(context).pop();
-                          },
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.5),
-                                  shape: BoxShape.circle,
-                                ),
-                                padding: EdgeInsets.all(0.6),
-                                child: Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                              // SizedBox(width: 8,),
-                              // Container(
-                              //  decoration: BoxDecoration(
-                              //   color: Colors.black.withOpacity(0.5),
-                              //   shape: BoxShape.circle,
-                              //  ),
-                              //   padding: EdgeInsets.all(0.6),
-                              //   child: Icon(
-                              //     Icons.check,
-                              //     color: Colors.white,
-                              //     size: 20,
-                              //   ),
-                              // ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ),
             ),
-            SizedBox(height: 2),
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -511,8 +584,20 @@ Future<Uint8List?> processImageContrast(Uint8List imageBytes, doubleContrastValu
                               onFilterChanged: (double brightness) {
                                 _applyBrightnessFilter(brightness: brightness);
                               },
-                              onContrastChanged: (double contrastValue){
-                                _applyContrastFilter(contrastValue: contrastValue);
+                              onContrastChanged: (double contrastValue) {
+                                _applyContrastFilter(
+                                    contrastValue: contrastValue);
+                              },
+                              onSaturationChanged: (double saturationValue) {
+                                _applySaturationFilter(
+                                    saturationValue: saturationValue);
+                              },
+                              onExposureChanged: (double exposureValue) {
+                                _applyExposureFilter(
+                                    exposureValue: exposureValue);
+                              },
+                              onHueChanged: (double hueValue) {
+                                _applyHueFilter(hueValue: hueValue);
                               },
                             ),
                           )),
