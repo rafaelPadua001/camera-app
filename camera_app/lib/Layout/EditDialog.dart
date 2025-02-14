@@ -86,6 +86,18 @@ Uint8List? _processImageHueBackground(List<dynamic> params) {
   return Uint8List.fromList(img.encodePng(adjustedImage));
 }
 
+// Uint8List? _processImageTemperatureBackground(List<dynamic> params){
+//   Uint8List imageBytes = params[0] as Uint8List;
+//   double temperatureValue = params[1] as double;
+
+//   img.Image? image = img.decodeImage(imageBytes);
+//   if(image == null) return null;
+
+//   img.Image? adjustedImage = img.adjustColor(image, temperature: temperatureValue);
+
+//   return Uint8List.fromList(img.encodePng(adjustedImage));
+// }
+
 class _EditDialogState extends State<EditDialog> {
   ui.Image? processedImage;
   Uint8List? processedImageBytes;
@@ -238,6 +250,23 @@ class _EditDialogState extends State<EditDialog> {
       });
     }
   }
+
+  // void _aplyTemperatureFilter({double temperatureValue = 0.0}) async {
+  //   Uint8List imageBytes = processedImageBytes ?? await widget.image.readAsBytes();
+  //   double adjustTemperatureValue = temperatureValue;
+
+  //   Uint8List? updateBytes = await compute(
+  //     _processImageTemperatureBackground,
+  //     [imageBytes, adjustTemperatureValue],
+  //   );
+
+  //   if(updateBytes != null && mounted){
+  //     setState(() {
+  //       processedImageBytes = updateBytes;
+  //       _isProcessing = false;
+  //     });
+  //   }
+  // }
 
   Future<void> _convertImageToBytes(ui.Image image) async {
     try {
@@ -599,6 +628,9 @@ class _EditDialogState extends State<EditDialog> {
                               onHueChanged: (double hueValue) {
                                 _applyHueFilter(hueValue: hueValue);
                               },
+                              // onTemperatureChanged: (double temperatureValue){
+                              //   _applyTemperatureFilter(temperatureValue: temperatureValue);
+                              // },
                             ),
                           )),
           ],
