@@ -14,35 +14,46 @@ class RemoveDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: Colors.grey.withOpacity(0.8),
-      title: const Text('Remove Dialog'),
-      content: SingleChildScrollView(
-        child: ListBody(
-          children: <Widget>[
-            Text('Remove this image? ${image.path.split('/').last}'),
-            SizedBox(height: 30),
-            Image.file(image, fit: BoxFit.cover),
-            Text('Would you like to remove this image?'),
+    double screenHeight = MediaQuery.of(context).size.height;
+    double dialogHeight = screenHeight * 0.6;
+
+    return Dialog(
+      backgroundColor: Colors.grey.withOpacity(0.3),
+      child: SizedBox(
+        height: dialogHeight,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.cancel, color: Colors.white),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                Text('Remove Dialog'),
+                IconButton(
+                  icon: Icon(Icons.check_circle, color: Colors.white),
+                  onPressed: () {
+                    onConfirm(); // Chama a função de confirmação
+                    onReloadGallery(); // Chama a função para recarregar a galeria
+                    Navigator.of(context).pop(); // Fecha o diálogo
+                  },
+                ),
+              ],
+            ),
+            SingleChildScrollView(
+              child: ListBody(
+                children: <Widget>[
+                  Image.file(image, fit: BoxFit.cover),
+                ],
+              ),
+            ),
           ],
         ),
       ),
-      actions: <Widget>[
-        TextButton(
-          child: const Text('Cancel'),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-        ),
-        TextButton(
-          child: const Text('Ok'),
-          onPressed: () {
-            onConfirm(); // Chama a função de confirmação
-            onReloadGallery(); // Chama a função para recarregar a galeria
-            Navigator.of(context).pop(); // Fecha o diálogo
-          },
-        ),
-      ],
     );
   }
 }
