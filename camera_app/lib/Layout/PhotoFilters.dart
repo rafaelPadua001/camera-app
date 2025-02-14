@@ -7,11 +7,13 @@ class FilteredImageWidget extends StatefulWidget {
   final Uint8List? processedImage;
   final Function(double)
       onFilterChanged; //callbar oara enviar os valores do sliders
+  final Function(double) onContrastChanged;
 
   const FilteredImageWidget({
     required this.originalImage,
     this.processedImage,
     required this.onFilterChanged,
+    required this.onContrastChanged,
   });
 
   @override
@@ -25,7 +27,7 @@ class _FilteredImageWidgetState extends State<FilteredImageWidget> {
 
   //brightness initial value
   double _brightness = 1.0;
-
+  double _contrast = 0.0;
   // Função para criar uma lista de filtros personalizados
 
   @override
@@ -47,19 +49,20 @@ class _FilteredImageWidgetState extends State<FilteredImageWidget> {
               ),
             ),
             Slider(
-              value: _currentSliderPrimaryValue,
-              secondaryTrackValue: _currentSliderSecondaryValue,
-              label: _currentSliderPrimaryValue.round().toString(),
-              onChanged: (double value) {
+              value: _brightness,
+              secondaryTrackValue: _contrast,
+              min: -1.0,
+              max: 1.0,
+              divisions: 20,
+              label: _brightness.toStringAsFixed(2),
+              onChanged: (value) {
                 setState(() {
-                  _currentSliderPrimaryValue = value;
-                  _brightness = value.clamp(-1.0, 1.0);
+                  _brightness = value;
                 });
               },
-              onChangeEnd: (double value) {
+              onChangeEnd: (value) {
                 // Chama a função apenas quando o usuário soltar o Slider
-                widget.onFilterChanged(_brightness);
-                
+                widget.onFilterChanged(value);
               },
             ),
             Text(
@@ -70,13 +73,19 @@ class _FilteredImageWidgetState extends State<FilteredImageWidget> {
               ),
             ),
             Slider(
-              value: _currentSliderSecondaryValue,
+              value: _contrast,
               secondaryTrackValue: _currentSliderThirdValue,
-              label: _currentSliderSecondaryValue.round().toString(),
-              onChanged: (double value) {
+              min: -1.0,
+              max: 1.0,
+              divisions: 20,
+              label: _contrast.toStringAsFixed(2),
+              onChanged: (value) {
                 setState(() {
-                  _currentSliderSecondaryValue = value.clamp(-1.0, 1.0);
+                  _contrast = value;
                 });
+              },
+              onChangeEnd: (value){
+                widget.onContrastChanged(value);
               },
             ),
             Text(
@@ -88,9 +97,6 @@ class _FilteredImageWidgetState extends State<FilteredImageWidget> {
             ),
             Slider(
               value: _currentSliderThirdValue,
-              min: -1.0,
-              max: 1.0,
-              divisions: 100,
               label: _currentSliderThirdValue.round().toString(),
               onChanged: (double value) {
                 setState(() {

@@ -14,7 +14,7 @@ import 'package:flutter/foundation.dart';
 class EditDialog extends StatefulWidget {
   final File image; // Imagem original
   final ui.Image? processedImage; // Imagem processada (pode ser null)
-
+ 
   EditDialog({
     required this.image,
     this.processedImage,
@@ -24,6 +24,35 @@ class EditDialog extends StatefulWidget {
   _EditDialogState createState() => _EditDialogState();
 }
 
+
+
+Uint8List? _processImageInBackground(List<Object> params) {
+  Uint8List imageBytes = params[0] as Uint8List;
+  double brightness = params[1] as double;
+ 
+  img.Image? image = img.decodeImage(imageBytes);
+  if (image == null) return null;
+
+  // Reduz a resolução antes de processar (opcional)
+//  image = img.copyResize(image, width: 500);
+
+  img.Image adjustedImage = img.adjustColor(image, brightness: brightness);
+
+  return Uint8List.fromList(img.encodePng(adjustedImage));
+}
+
+Uint8List? _processImageContrastBackground(List<dynamic> params){
+  Uint8List imageBytes = params[0] as Uint8List;
+  double contrastValue = params[1] as double;
+
+  img.Image? image = img.decodeImage(imageBytes);
+  if(image == null) return null;
+
+  img.Image adjustedImage = img.adjustColor(image, contrast: contrastValue);
+
+  return Uint8List.fromList(img.encodePng(adjustedImage));
+}
+
 class _EditDialogState extends State<EditDialog> {
   ui.Image? processedImage;
   Uint8List? processedImageBytes;
@@ -31,7 +60,8 @@ class _EditDialogState extends State<EditDialog> {
   bool isLoading = false;
   String _selectedOption = 'Select Hair';
   Color _selectedColor = Colors.black;
-
+   bool _isProcessing = false;
+  
   @override
   void initState() {
     super.initState();
@@ -60,28 +90,63 @@ class _EditDialogState extends State<EditDialog> {
     }
   }
 
-void _applyBrightnessFilter({double brightness = 1.0}) async {
+void _applyBrightnessFilter({double brightness = 0.0}) async {
   if (widget.image == null || !await widget.image.exists()) {
     return;
   }
 
+  setState(() => _isProcessing  = true); // mostra indicador de carregamento
+
   Uint8List imageBytes = await widget.image.readAsBytes();
-  double adjustedBrightness = brightness.clamp(0.1, 1.0);
+  double adjustedBrightness = brightness;
 
   // Processando em um isolate sem objetos complexos
   Uint8List? updatedBytes = await compute(
-    processImageInBackground,
+    _processImageInBackground,
     [imageBytes, adjustedBrightness], // Usar uma lista ao invés de map
   );
 
   if (updatedBytes != null && mounted) {
     setState(() {
       processedImageBytes = updatedBytes;
+      _isProcessing = false;
+    });
+
+   // widget.onFilterChanged(updatedBytes);
+  }
+}
+
+void _applyContrastFilter({double contrastValue = 0.0}) async {
+  if(widget.image == null || !await widget.image.exists()){
+    return;
+  }
+
+  setState(() => _isProcessing = true);
+  Uint8List imageBytes = await widget.image.readAsBytes();
+  double adjustedContrastValue = contrastValue;
+
+  
+
+  Uint8List? updatedBytes = await compute(
+    _processImageContrastBackground,
+    [imageBytes, adjustedContrastValue],
+  );
+
+  if(updatedBytes != null && mounted){
+    setState(() {
+      processedImageBytes = updatedBytes;
+      _isProcessing = false;
     });
   }
 }
 
+Future<Uint8List?> processImage(Uint8List imageBytes, doubleBrightness) async {
+  return await compute(_processImageInBackground, [imageBytes, Brightness]);
+}
 
+Future<Uint8List?> processImageContrast(Uint8List imageBytes, doubleContrastValue) async {
+  return await compute(_processImageContrastBackground, [imageBytes, doubleContrastValue]);
+}
 
   Future<void> _convertImageToBytes(ui.Image image) async {
     try {
@@ -110,20 +175,6 @@ void _applyBrightnessFilter({double brightness = 1.0}) async {
     }
   }
 
-// Uint8List? processImageInBackground(List<dynamic> params) {
-//   Uint8List imageBytes = params[0] as Uint8List;
-//   double brightness = params[1] as double;
-
-//   // Decodificar a imagem
-//   img.Image? image = img.decodeImage(imageBytes);
-//   if (image == null) return null;
-
-//   // Ajustar brilho
-//   img.Image adjustedImage = img.adjustColor(image, brightness: brightness);
-
-//   // Retornar bytes da imagem processada
-//   return Uint8List.fromList(img.encodePng(adjustedImage));
-// }
   Uint8List _resizeImage(Uint8List imageBytes, int width, int height) {
     img.Image? image = img.decodeImage(imageBytes);
     if (image == null) {
@@ -460,6 +511,9 @@ void _applyBrightnessFilter({double brightness = 1.0}) async {
                               onFilterChanged: (double brightness) {
                                 _applyBrightnessFilter(brightness: brightness);
                               },
+                              onContrastChanged: (double contrastValue){
+                                _applyContrastFilter(contrastValue: contrastValue);
+                              },
                             ),
                           )),
           ],
@@ -467,20 +521,4 @@ void _applyBrightnessFilter({double brightness = 1.0}) async {
       ),
     );
   }
-}
-
-
-Uint8List? processImageInBackground(List<dynamic> params) {
-  Uint8List imageBytes = params[0] as Uint8List;
-  double brightness = params[1] as double;
-
-  // Decodificar a imagem
-  img.Image? image = img.decodeImage(imageBytes);
-  if (image == null) return null;
-
-  // Ajustar brilho
-  img.Image adjustedImage = img.adjustColor(image, brightness: brightness);
-
-  // Retornar bytes da imagem processada
-  return Uint8List.fromList(img.encodePng(adjustedImage));
 }
