@@ -5,6 +5,9 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(rootProject.file("key.properties")))
+
 android {
     namespace = "com.example.camera_app"
     compileSdk = flutter.compileSdkVersion
@@ -29,13 +32,32 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
-
+    signingConfigs {
+        release {
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+        }
+    }
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+           // signingConfig = signingConfigs.debug
+           signingConfig = signingConfigs.release
+           minifyEnabled true //otimização opicional
+           shrinkResources true
+           proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
         }
+    }
+    dependencies {
+        implementation 'com.google.android.play:core:1.10.3'
+        implementation 'com.google.android.play:core-ktx:1.8.1'
+        
+        implementation 'org.tensorflow:tensorflow-lite:2.10.0'
+        implementation 'org.tensorflow:tensorflow-lite-gpu:2.10.0'
     }
 }
 
