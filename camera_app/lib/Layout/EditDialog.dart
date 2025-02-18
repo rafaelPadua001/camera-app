@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img; // Para manipulação de imagens
 import 'ColorPicker.dart';
 import 'package:flutter/foundation.dart';
+import '../Filters/filter_type.dart';
 
 class EditDialog extends StatefulWidget {
   final File image; // Imagem original
@@ -25,78 +26,39 @@ class EditDialog extends StatefulWidget {
 
 Uint8List? _processImageInBackground(List<Object> params) {
   Uint8List imageBytes = params[0] as Uint8List;
-  double brightness = params[1] as double;
+  int filterIndex = params[1] as int;
+  double value = params[2] as double;
 
   img.Image? image = img.decodeImage(imageBytes);
-  if (image == null) return null;
 
-  // Reduz a resolução antes de processar (opcional)
-//  image = img.copyResize(image, width: 500);
+  if (image == null) {
+    print("Erro: Falha ao decodificar imagem no background!");
+    return null;
+  }
 
-  img.Image adjustedImage = img.adjustColor(image, brightness: brightness);
+  FilterType filter = FilterType.values[filterIndex];
 
-  return Uint8List.fromList(img.encodePng(adjustedImage));
+  img.Image adjustedImage;
+  switch (filter) {
+    case FilterType.brightness:
+      adjustedImage = img.adjustColor(image, brightness: value);
+      break;
+    case FilterType.contrast:
+      adjustedImage = img.adjustColor(image, contrast: value);
+      break;
+    case FilterType.saturation:
+      adjustedImage = img.adjustColor(image, saturation: value);
+      break;
+    case FilterType.exposure:
+      adjustedImage = img.adjustColor(image, exposure: value);
+      break;
+    case FilterType.hue:
+      adjustedImage = img.adjustColor(image, hue: value);
+      break;
+  }
+
+  return Uint8List.fromList(img.encodeJpg(adjustedImage));
 }
-
-Uint8List? _processImageContrastBackground(List<dynamic> params) {
-  Uint8List imageBytes = params[0] as Uint8List;
-  double contrastValue = params[1] as double;
-
-  img.Image? image = img.decodeImage(imageBytes);
-  if (image == null) return null;
-
-  img.Image adjustedImage = img.adjustColor(image, contrast: contrastValue);
-
-  return Uint8List.fromList(img.encodePng(adjustedImage));
-}
-
-Uint8List? _processImageSaturarionBackground(List<dynamic> params) {
-  Uint8List imageBytes = params[0] as Uint8List;
-  double saturationValue = params[1] as double;
-
-  img.Image? image = img.decodeImage(imageBytes);
-  if (image == null) return null;
-
-  img.Image adjustedImage = img.adjustColor(image, saturation: saturationValue);
-
-  return Uint8List.fromList(img.encodePng(adjustedImage));
-}
-
-Uint8List? _processImageExposureBackground(List<dynamic> params) {
-  Uint8List imageBytes = params[0] as Uint8List;
-  double exposureValue = params[1] as double;
-
-  img.Image? image = img.decodeImage(imageBytes);
-  if (image == null) return null;
-
-  img.Image adjustedImage = img.adjustColor(image, exposure: exposureValue);
-
-  return Uint8List.fromList(img.encodePng(adjustedImage));
-}
-
-Uint8List? _processImageHueBackground(List<dynamic> params) {
-  Uint8List imageBytes = params[0] as Uint8List;
-  double hueValue = params[1] as double;
-
-  img.Image? image = img.decodeImage(imageBytes);
-  if (image == null) return null;
-
-  img.Image adjustedImage = img.adjustColor(image, hue: hueValue);
-
-  return Uint8List.fromList(img.encodePng(adjustedImage));
-}
-
-// Uint8List? _processImageTemperatureBackground(List<dynamic> params){
-//   Uint8List imageBytes = params[0] as Uint8List;
-//   double temperatureValue = params[1] as double;
-
-//   img.Image? image = img.decodeImage(imageBytes);
-//   if(image == null) return null;
-
-//   img.Image? adjustedImage = img.adjustColor(image, temperature: temperatureValue);
-
-//   return Uint8List.fromList(img.encodePng(adjustedImage));
-// }
 
 class _EditDialogState extends State<EditDialog> {
   ui.Image? processedImage;
@@ -135,70 +97,28 @@ class _EditDialogState extends State<EditDialog> {
     }
   }
 
-  void _applyBrightnessFilter({double brightness = 0.0}) async {
-    if (widget.image == null || !await widget.image.exists()) {
+  void _applyFilter(FilterType filter, double value) async {
+    if (widget.image == null) {
       return;
     }
 
-    setState(() => _isProcessing = true); // mostra indicador de carregamento
+    bool exists = await widget.image.exists();
+    if (!exists) {
+      return;
+    }
 
-    Uint8List imageBytes =
-        processedImageBytes ?? await widget.image.readAsBytes();
-    double adjustedBrightness = brightness;
+    Uint8List imageBytes = await widget.image.readAsBytes();
 
-    // Processando em um isolate sem objetos complexos
-    Uint8List? updatedBytes = await compute(
+    if (imageBytes.isEmpty) {
+      return;
+    }
+
+   
+    setState(() => _isProcessing = true);
+
+    Uint8List? updateBytes = await compute(
       _processImageInBackground,
-      [imageBytes, adjustedBrightness], // Usar uma lista ao invés de map
-    );
-
-    if (updatedBytes != null && mounted) {
-      setState(() {
-        processedImageBytes = updatedBytes;
-        _isProcessing = false;
-      });
-
-      // widget.onFilterChanged(updatedBytes);
-    }
-  }
-
-  void _applyContrastFilter({double contrastValue = 0.0}) async {
-    if (widget.image == null || !await widget.image.exists()) {
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-    Uint8List imageBytes =
-        processedImageBytes ?? await widget.image.readAsBytes();
-    double adjustedContrastValue = contrastValue;
-
-    Uint8List? updatedBytes = await compute(
-      _processImageContrastBackground,
-      [imageBytes, adjustedContrastValue],
-    );
-
-    if (updatedBytes != null && mounted) {
-      setState(() {
-        processedImageBytes = updatedBytes;
-        _isProcessing = false;
-      });
-    }
-  }
-
-  void _applySaturationFilter({double saturationValue = 0.0}) async {
-    if (widget.image == null || !await widget.image.exists()) {
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-
-    Uint8List imageBytes =
-        processedImageBytes ?? await widget.image.readAsBytes();
-    double adjustedSaturationValue = saturationValue;
-
-    Uint8List? updateBytes = await compute(
-      _processImageSaturarionBackground,
-      [imageBytes, adjustedSaturationValue],
+      [imageBytes, filter.index, value],
     );
 
     if (updateBytes != null && mounted) {
@@ -206,67 +126,10 @@ class _EditDialogState extends State<EditDialog> {
         processedImageBytes = updateBytes;
         _isProcessing = false;
       });
+    } else {
+      print("Erro: Falha ao processar imagem!");
     }
   }
-
-  void _applyExposureFilter({double exposureValue = 0.0}) async {
-    if (widget.image == null || !await widget.image.exists()) {
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-
-    Uint8List imageBytes =
-        processedImageBytes ?? await widget.image.readAsBytes();
-    double adjustedExposureValue = exposureValue;
-
-    Uint8List? updateBytes = await compute(
-      _processImageExposureBackground,
-      [imageBytes, adjustedExposureValue],
-    );
-
-    if (updateBytes != null && mounted) {
-      setState(() {
-        processedImageBytes = updateBytes;
-        _isProcessing = false;
-      });
-    }
-  }
-
-  void _applyHueFilter({double hueValue = 0.0}) async {
-    Uint8List imageBytes =
-        processedImageBytes ?? await widget.image.readAsBytes();
-    double adjustedHueValue = hueValue;
-
-    Uint8List? updateBytes = await compute(
-      _processImageHueBackground,
-      [imageBytes, adjustedHueValue],
-    );
-
-    if (updateBytes != null && mounted) {
-      setState(() {
-        processedImageBytes = updateBytes;
-        _isProcessing = false;
-      });
-    }
-  }
-
-  // void _aplyTemperatureFilter({double temperatureValue = 0.0}) async {
-  //   Uint8List imageBytes = processedImageBytes ?? await widget.image.readAsBytes();
-  //   double adjustTemperatureValue = temperatureValue;
-
-  //   Uint8List? updateBytes = await compute(
-  //     _processImageTemperatureBackground,
-  //     [imageBytes, adjustTemperatureValue],
-  //   );
-
-  //   if(updateBytes != null && mounted){
-  //     setState(() {
-  //       processedImageBytes = updateBytes;
-  //       _isProcessing = false;
-  //     });
-  //   }
-  // }
 
   Future<void> _convertImageToBytes(ui.Image image) async {
     try {
@@ -610,27 +473,32 @@ class _EditDialogState extends State<EditDialog> {
                             child: FilteredImageWidget(
                               originalImage: widget.image,
                               processedImage: processedImageBytes,
-                              onFilterChanged: (double brightness) {
-                                _applyBrightnessFilter(brightness: brightness);
+                              onFilterChanged:
+                                  (String label, double value) async {
+                                FilterType? filterType;
+                                switch (label) {
+                                  case "Brightness":
+                                    filterType = FilterType.brightness;
+                                    break;
+                                  case "Contrast":
+                                    filterType = FilterType.contrast;
+                                    break;
+                                  case "Saturation":
+                                    filterType = FilterType.saturation;
+                                    break;
+                                  case "Hue":
+                                    filterType = FilterType.hue;
+                                    break;
+                                  case "Exposure":
+                                    filterType = FilterType.exposure;
+                                    break;
+                                  default:
+                                    print("Filtro inválido: $label");
+                                    return;
+                                }
+
+                                _applyFilter(filterType, value);
                               },
-                              onContrastChanged: (double contrastValue) {
-                                _applyContrastFilter(
-                                    contrastValue: contrastValue);
-                              },
-                              onSaturationChanged: (double saturationValue) {
-                                _applySaturationFilter(
-                                    saturationValue: saturationValue);
-                              },
-                              onExposureChanged: (double exposureValue) {
-                                _applyExposureFilter(
-                                    exposureValue: exposureValue);
-                              },
-                              onHueChanged: (double hueValue) {
-                                _applyHueFilter(hueValue: hueValue);
-                              },
-                              // onTemperatureChanged: (double temperatureValue){
-                              //   _applyTemperatureFilter(temperatureValue: temperatureValue);
-                              // },
                             ),
                           )),
           ],

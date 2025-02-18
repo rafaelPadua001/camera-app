@@ -5,22 +5,14 @@ import 'package:flutter/material.dart';
 class FilteredImageWidget extends StatefulWidget {
   final File originalImage;
   final Uint8List? processedImage;
-  final Function(double)
+  final Function(String, double)
       onFilterChanged; //callbar oara enviar os valores do sliders
-  final Function(double) onContrastChanged;
-  final Function(double) onSaturationChanged;
-  final Function(double) onExposureChanged;
-  final Function(double) onHueChanged;
+
 
   const FilteredImageWidget({
     required this.originalImage,
     this.processedImage,
     required this.onFilterChanged,
-    required this.onContrastChanged,
-    required this.onSaturationChanged,
-    required this.onExposureChanged,
-    required this.onHueChanged,
-    // required this.onTemperatureChanged
   });
 
   @override
@@ -28,161 +20,87 @@ class FilteredImageWidget extends StatefulWidget {
 }
 
 class _FilteredImageWidgetState extends State<FilteredImageWidget> {
-  double _brightness = 0.0;
-  double _contrast = 0.0;
-  double _saturation = 0.0;
-  double _exposure = 0.0;
-  double _hue = 0.0;
-  // double _temperature = 0.0;
+  final Map<String, bool> _expandedStates = {
+    "Brightness & Contrast": false,
+    "Saturation & Hue": false,
+    "Exposure": false,
+    "Others": false,
+  };
+
+  final Map<String, double> _sliderValues = {
+    "Brightness": 0.0,
+    "Contrast": 0.0,
+    "Saturation": 0.0,
+    "Hue": 0.0,
+    "Exposure": 0.0,
+    "Others": 0.0,
+  };
+
+  bool _isExpanded = false;
+
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 300,
-      height: 350,
-      color: Colors.grey.withOpacity(0.1),
+    return ListView(
+      children: [
+        _buildCard("Brightness & Contrast", "Brightness", "Contrast"),
+        _buildCard("Saturation & Hue", "Saturation", "Hue"),
+        _buildCard("Exposure", "Exposure"),
+      ],
+    );
+  }
+
+  Widget _buildCard(String title, String label1, [String? label2]) {
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(title),
+            trailing: IconButton(
+              icon: Icon(_expandedStates[title]!
+                  ? Icons.arrow_upward
+                  : Icons.arrow_downward),
+              onPressed: () {
+                setState(() {
+                  _expandedStates[title] = !_expandedStates[title]!;
+                });
+              },
+            ),
+          ),
+          if (_expandedStates[title]!) ...[
+            _buildSlider(label1),
+            if(label2 != null) _buildSlider(label2),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSlider(String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Flexible(
-            child: SingleChildScrollView(
-                child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Brightness:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Slider(
-                  value: _brightness,
-                  secondaryTrackValue: _contrast,
-                  min: -1.0,
-                  max: 1.0,
-                  divisions: 20,
-                  label: _brightness.toStringAsFixed(2),
-                  onChanged: (value) {
-                    setState(() {
-                      _brightness = value;
-                    });
-                  },
-                  onChangeEnd: (value) {
-                    // Chama a função apenas quando o usuário soltar o Slider
-                    widget.onFilterChanged(value);
-                  },
-                ),
-                Text(
-                  'Contrast:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Slider(
-                  value: _contrast,
-                  secondaryTrackValue: _saturation,
-                  min: -1.0,
-                  max: 1.0,
-                  divisions: 20,
-                  label: _contrast.toStringAsFixed(2),
-                  onChanged: (value) {
-                    setState(() {
-                      _contrast = value;
-                    });
-                  },
-                  onChangeEnd: (value) {
-                    widget.onContrastChanged(value);
-                  },
-                ),
-                Text(
-                  'Saturation:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Slider(
-                    value: _saturation,
-                    label: _saturation.toStringAsFixed(2),
-                    min: -1.0,
-                    max: 1.0,
-                    divisions: 20,
-                    onChanged: (double value) {
-                      setState(() {
-                        //_currentSliderThirdValue = value;
-                        _saturation = value;
-                      });
-                    },
-                    onChangeEnd: (double value) {
-                      widget.onSaturationChanged(value);
-                    }),
-                Text(
-                  'Exposure:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Slider(
-                    value: _exposure,
-                    label: _exposure.toStringAsFixed(2),
-                    min: -1.0,
-                    max: 1.0,
-                    divisions: 20,
-                    onChanged: (double value) {
-                      setState(() {
-                        //_currentSliderThirdValue = value;
-                        _exposure = value;
-                      });
-                    },
-                    onChangeEnd: (double value) {
-                      widget.onExposureChanged(value);
-                    }),
-                Text(
-                  'Hue:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Slider(
-                    value: _hue,
-                    label: _hue.toStringAsFixed(2),
-                    min: -1.0,
-                    max: 1.0,
-                    divisions: 20,
-                    onChanged: (double value) {
-                      setState(() {
-                        //_currentSliderThirdValue = value;
-                        _hue = value;
-                      });
-                    },
-                    onChangeEnd: (double value) {
-                      widget.onHueChanged(value);
-                    }),
-                //  Text(
-                //   'Temerature:',
-                //   style: TextStyle(
-                //     fontSize: 12,
-                //     fontWeight: FontWeight.bold,
-                //   ),
-                // ),
-                // Slider(
-                //     value: _temperature,
-                //     label: _temperature.toStringAsFixed(2),
-                //     onChanged: (double value) {
-                //       setState(() {
-                //         //_currentSliderThirdValue = value;
-                //         _temperature = value;
-                //       });
-                //     },
-                //     onChangeEnd: (double value) {
-                //       widget.onTemperatureChanged(value);
-                //     }),
-              ],
-            )),
+        children: [
+          Text(
+            '$label:',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+          Slider(
+            value: _sliderValues[label]!,
+            min: -1.0,
+            max: 1.0,
+            divisions: 20,
+            label: _sliderValues[label]!.toStringAsFixed(2),
+            onChanged: (value) {
+              setState(() {
+                _sliderValues[label] = value;
+              });
+            },
+            onChangeEnd: (value) {
+              widget.onFilterChanged(
+                  label, value); // Envia o nome do filtro e o valor atualizado
+            },
           ),
         ],
       ),
