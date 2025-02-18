@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'Camera.dart';
 import 'Layout/BottomBar.dart';
 import 'Galery.dart'; // Importa a página da galeria ou outras páginas que você tem
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  MobileAds.instance.initialize();
   runApp(const MyApp());
 }
 
@@ -18,14 +22,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.white,
           brightness: Brightness.dark,
-        ).copyWith(
-          // primary: Colors.white,
-          // secondary: Colors.black,
-          // surface: Colors.black,
-          // onSurface: Colors.white,
-          // onPrimary: Colors.white,
-          // onSecondary: Colors.white,
-        ),
+        ).copyWith(),
         useMaterial3: true,
       ),
       home: const HomeScreen(), // Altera para HomeScreen
@@ -43,6 +40,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0; // Índice da página selecionada
 
+  //Variáveis para os anúncios
+  late BannerAd _bannerAd;
+  bool _isBannerAdLoaded = false;
+
   // Lista de widgets das páginas
   final List<Widget> _pages = [
     MyHomePage(title: 'BarberEase'), // Sua página inicial
@@ -50,6 +51,39 @@ class _HomeScreenState extends State<HomeScreen> {
     Camera(), // A página da galeria que você criou
     // Adicione mais páginas conforme necessário
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBannerAd(); // Chama a função para carregar o banner ao iniciar
+  }
+
+  void _loadBannerAd() {
+    _bannerAd = BannerAd(
+      adUnitId: 'ca-app-pub-3940256099942544/6300978111',
+      size: AdSize.banner,
+      request: AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (Ad ad) {
+          print('Ad loaded: ${ad.adUnitId}');
+          setState(() {
+            _isBannerAdLoaded = true;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          print('Failed to load banner ad: $error');
+          ad.dispose();
+        },
+      ),
+    );
+    _bannerAd.load();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _bannerAd.dispose(); // Libera o banner quando a tela for descartada
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -63,8 +97,22 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text('BarberEase'),
       ),
-      body: _pages[
-          _selectedIndex], // Renderiza a página com base no índice selecionado
+      body: Stack(
+        children: [
+          //Página Ativa
+          _pages[_selectedIndex],
+
+          //Exibe o banner se carregado
+          if (_isBannerAdLoaded)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                height: 50,
+                child: AdWidget(ad: _bannerAd), // Exibe o banner
+              ),
+            ),
+        ],
+      ),
       bottomNavigationBar: Bottombar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped, // Passa a função para mudar de página
@@ -74,7 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// Aqui está sua classe MyHomePage
 class MyHomePage extends StatelessWidget {
   final String title;
 
@@ -83,13 +130,11 @@ class MyHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child:
-          Text('Bem vindo ao BarberEase...'), // O botão central que você já tem
+      child: Text('Bem-vindo ao BarberEase...'), // O botão central que você já tem
     );
   }
 }
 
-// Certifique-se de que sua classe Bottombar aceita os parâmetros currentIndex e onTap
 class Bottombar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;

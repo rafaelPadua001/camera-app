@@ -5,6 +5,8 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+
+
 def keystoreProperties = new Properties()
 keystoreProperties.load(new FileInputStream(rootProject.file("key.properties")))
 
@@ -58,6 +60,7 @@ android {
         
         implementation 'org.tensorflow:tensorflow-lite:2.10.0'
         implementation 'org.tensorflow:tensorflow-lite-gpu:2.10.0'
+        implementation("com.google.android.gms:play-services-ads:23.6.0")
     }
 }
 

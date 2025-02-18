@@ -14,6 +14,10 @@
         android:enableOnBackInvokedCallback="true"
         android:requestLegacyExternalStorage="true"
     >
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-7916033089968965~6776555120"
+        />
         <activity
             android:name=".MainActivity"
             android:exported="true"
