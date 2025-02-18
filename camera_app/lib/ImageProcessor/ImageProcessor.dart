@@ -41,7 +41,7 @@ class ImageProcessor {
     // Redimensionar máscara
     final resizedMask = _resizeMaskToImageSize(
         hairMask, maskDimension, originalImage.width, originalImage.height);
-    final blurredMask = _blurMask(resizedMask, 100);
+    final blurredMask = _blurMask(resizedMask, 2);
 
     // await _saveDebugImage(resizedMask, 'debug_resized_mask.png');
 
@@ -108,7 +108,7 @@ class ImageProcessor {
   Uint8List hairImageBytes, {
   required List<int> hairMask,
   int maskMargin = 0,
-  double scale = 0.75,
+  double scale = 1.0,
 }) {
   final hairImage = img.decodeImage(hairImageBytes);
   if (hairImage == null) {
