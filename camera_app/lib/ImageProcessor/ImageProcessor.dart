@@ -41,9 +41,8 @@ class ImageProcessor {
     // Redimensionar máscara
     final resizedMask = _resizeMaskToImageSize(
         hairMask, maskDimension, originalImage.width, originalImage.height);
-    final blurredMask = _blurMask(resizedMask, 2);
+    final blurredMask = _blurMask(resizedMask, 100);
 
-    // await _saveDebugImage(resizedMask, 'debug_resized_mask.png');
 
     // Aplicar máscara de cabelo
     final processedImage = _applyHairMask(
@@ -53,8 +52,7 @@ class ImageProcessor {
       maskMargin: 0, // Ajustável
     );
 
-    // Salvar imagem processada para depuração
-    // await _saveDebugImage(originalImage, 'debug_processed_image.png');
+   
 
     // Fechar o modelo
     await tensorFlowHelper.closeModel();
@@ -91,24 +89,14 @@ class ImageProcessor {
     }
   }
 
-  // Future<void> _saveDebugImage(img.Image image, String fileName) async {
-  //   try {
-  //     final directory = await getTemporaryDirectory();
-  //     final filePath = '${directory.path}/$fileName';
-  //     final debugFile = File(filePath);
-  //     await debugFile.writeAsBytes(Uint8List.fromList(img.encodePng(image)));
-  //     print('Imagem de depuração salva em: $filePath');
-  //   } catch (e) {
-  //     print('Erro ao salvar a imagem de depuração: $e');
-  //   }
-  // }
+ 
 
   Uint8List _applyHairMask(
   img.Image originalImage,
   Uint8List hairImageBytes, {
   required List<int> hairMask,
   int maskMargin = 0,
-  double scale = 1.0,
+  double scale = 0.8,
 }) {
   final hairImage = img.decodeImage(hairImageBytes);
   if (hairImage == null) {
