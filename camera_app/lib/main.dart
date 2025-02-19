@@ -136,7 +136,9 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
     else{
-       _selectedIndex = index;
+        setState((){
+          _selectedIndex = index;
+        });
     }
     
   }
