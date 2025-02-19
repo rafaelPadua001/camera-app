@@ -44,6 +44,10 @@ class _HomeScreenState extends State<HomeScreen> {
   late BannerAd _bannerAd;
   bool _isBannerAdLoaded = false;
 
+  InterstitialAd? _interstitialAd;
+
+  final String adUnitId = 'ca-app-pub-3940256099942544/1033173712'; 
+
   // Lista de widgets das páginas
   final List<Widget> _pages = [
     MyHomePage(title: 'BarberEase'), // Sua página inicial
@@ -56,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadBannerAd(); // Chama a função para carregar o banner ao iniciar
+    _loadInterstitialAd();
   }
 
   void _loadBannerAd() {
@@ -78,6 +83,43 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _bannerAd.load();
   }
+  
+  void _loadInterstitialAd() {
+    InterstitialAd.load(
+      adUnitId: adUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (InterstitialAd ad) {
+          _interstitialAd = ad;
+        },
+        onAdFailedToLoad: (LoadAdError error) {
+          print('Falha ao carregar o anúncio: $error');
+          _interstitialAd = null;
+        },
+      ),
+    );
+  }
+
+  void _showInterstitialAd(VoidCallback onAdClosed) {
+    if (_interstitialAd != null) {
+      _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+        onAdDismissedFullScreenContent: (ad) {
+          ad.dispose();
+          _loadInterstitialAd(); // Recarrega um novo anúncio
+          onAdClosed(); // Chama a função para mudar de tela
+        },
+        onAdFailedToShowFullScreenContent: (ad, error) {
+          print('Erro ao exibir anúncio: $error');
+          ad.dispose();
+          onAdClosed(); // Se falhar, muda de tela direto
+        },
+      );
+
+      _interstitialAd!.show();
+    } else {
+      onAdClosed(); // Se não houver anúncio, muda de tela direto
+    }
+  }
 
   @override
   void dispose() {
@@ -86,9 +128,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index; // Atualiza o índice selecionado
-    });
+    if(index == 1 || index == 2){
+      _showInterstitialAd((){
+        setState((){
+          _selectedIndex = index;
+        });
+      });
+    }
+    else{
+       _selectedIndex = index;
+    }
+    
   }
 
   @override
