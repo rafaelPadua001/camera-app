@@ -39,11 +39,10 @@ class ImageProcessor {
     }
 
     // Redimensionar máscara
-    final resizedMask = _resizeMaskToImageSize(
-    hairMask, originalImage.width, originalImage.height);
-    final blurredMask = _blurMask(resizedMask, 6);
+    final resizedMask = _resizeMaskToImageSize(hairMask, originalImage.width, originalImage.height);
+    final blurredMask = _blurMask(resizedMask, 2);
 
-    // Aplicar máscara de cabelo
+    // Aplicar máscara de cabelo com melhorias no encaixe
     final processedImage = _applyHairMask(
       originalImage,
       hairImageBytes,
@@ -57,38 +56,31 @@ class ImageProcessor {
   }
 
   img.Image _blurMask(img.Image maskImage, int intensity) {
-    return img.smooth(maskImage, weight: intensity);
+    return img.gaussianBlur(maskImage, radius: intensity);
   }
 
-  img.Image _resizeMaskToImageSize(
-    List<int> mask, int targetWidth, int targetHeight) {
-  // Criar imagem sem canal alfa para evitar transparência
-  final maskImage = img.Image(
-    width: maskDimension,
-    height: maskDimension,
-    numChannels: 3, // Apenas RGB (sem transparência)
-  );
+  img.Image _resizeMaskToImageSize(List<int> mask, int targetWidth, int targetHeight) {
+    final maskImage = img.Image(
+      width: maskDimension,
+      height: maskDimension,
+      numChannels: 3, // Apenas RGB (sem transparência)
+    );
 
-  // Preencher a imagem com os valores binários (preto e branco)
-  for (int y = 0; y < maskDimension; y++) {
-    for (int x = 0; x < maskDimension; x++) {
-      final index = y * maskDimension + x;
-      final value = mask[index] == 1 ? 255 : 0; // 1 = branco, 0 = preto
-      maskImage.setPixelRgb(x, y, value, value, value); // RGB para branco ou preto
+    for (int y = 0; y < maskDimension; y++) {
+      for (int x = 0; x < maskDimension; x++) {
+        final index = y * maskDimension + x;
+        final value = mask[index] == 1 ? 255 : 0; 
+        maskImage.setPixelRgb(x, y, value, value, value);
+      }
     }
+
+    return img.copyResize(
+      maskImage,
+      width: targetWidth,
+      height: targetHeight,
+      interpolation: img.Interpolation.cubic,
+    );
   }
-
-  // Redimensionar a máscara para o tamanho da imagem original
-  final resizedMaskImage = img.copyResize(
-    maskImage,
-    width: targetWidth, // Usa as dimensões da imagem original
-    height: targetHeight,
-    interpolation: img.Interpolation.nearest, // Para garantir a binarização
-  );
-
-  return resizedMaskImage;
-}
-
 
   Future<Uint8List> _loadImageBytes(String path) async {
     if (path.startsWith('assets/')) {
@@ -100,45 +92,54 @@ class ImageProcessor {
     }
   }
 
- Uint8List _applyHairMask(img.Image originalImage, Uint8List hairImageBytes,
-    {required img.Image hairMask}) {
-  final hairImage = img.decodeImage(hairImageBytes);
-  if (hairImage == null) {
-    throw Exception("Erro ao decodificar a imagem de cabelo.");
-  }
+  Uint8List _applyHairMask(img.Image originalImage, Uint8List hairImageBytes,
+      {required img.Image hairMask}) {
+    final hairImage = img.decodeImage(hairImageBytes);
+    if (hairImage == null) {
+      throw Exception("Erro ao decodificar a imagem de cabelo.");
+    }
 
-  // Redimensiona a imagem de cabelo para se ajustar ao tamanho da imagem original
-  final resizedHairImage = img.copyResize(
-    hairImage,
-    width: originalImage.width,
-    height: originalImage.height,
-  );
+    // Ajuste do tamanho do cabelo para encaixe melhorado
+    final resizedHair = img.copyResize(
+      hairImage,
+      width: (originalImage.width * 0.85).toInt(), // 85% da largura original
+      height: (originalImage.height * 0.55).toInt(), // 55% da altura original
+      interpolation: img.Interpolation.cubic,
+    );
 
-  // Aplicar a máscara na imagem original pixel por pixel
-  for (int y = 0; y < originalImage.height; y++) {
-    for (int x = 0; x < originalImage.width; x++) {
-      final maskPixel = hairMask.getPixel(x, y).luminance;
+    // Ajuste de posição do cabelo na imagem original
+    final offsetY = (originalImage.height * 0.10).toInt(); // Move o cabelo para cima
 
-      if (maskPixel > 128) { // Se a máscara for "ativa" (branca)
-        // Apenas aplica a cor se a máscara estiver ativa
-        final hairPixel = resizedHairImage.getPixel(x, y);
-        final originalPixel = originalImage.getPixel(x, y);
+    // Criar uma imagem vazia para alinhar o cabelo corretamente
+    final alignedImage = img.Image.from(originalImage);
+    img.fill(alignedImage, color: img.ColorRgba8(0, 0, 0, 0)); // Fundo transparente
 
-        // Aplicação do blendedPixel para mistura mais suave
-        final factor = 0.9;
-        final blendedPixel = img.ColorRgba8(
-          ((hairPixel.r * factor) + (originalPixel.r * (1 - factor))).toInt(),
-          ((hairPixel.g * factor) + (originalPixel.g * (1 - factor))).toInt(),
-          ((hairPixel.b * factor) + (originalPixel.b * (1 - factor))).toInt(),
-          255,
-        );
 
-        originalImage.setPixel(x, y, blendedPixel);
+    // Coloca o cabelo na posição ajustada
+    img.compositeImage(alignedImage, resizedHair, dstX: 0, dstY: offsetY);
+
+    // Aplicar a máscara na imagem original pixel por pixel
+    for (int y = 0; y < originalImage.height; y++) {
+      for (int x = 0; x < originalImage.width; x++) {
+        final maskPixel = hairMask.getPixel(x, y).luminance;
+
+        if (maskPixel > 128) { // Se a máscara for "ativa" (branca)
+          final hairPixel = alignedImage.getPixel(x, y);
+          final originalPixel = originalImage.getPixel(x, y);
+
+          final factor = 0.85; // Mistura suave do cabelo com a imagem original
+          final blendedPixel = img.ColorRgba8(
+            ((hairPixel.r * factor) + (originalPixel.r * (1 - factor))).toInt(),
+            ((hairPixel.g * factor) + (originalPixel.g * (1 - factor))).toInt(),
+            ((hairPixel.b * factor) + (originalPixel.b * (1 - factor))).toInt(),
+            255,
+          );
+
+          originalImage.setPixel(x, y, blendedPixel);
+        }
       }
     }
+
+    return Uint8List.fromList(img.encodePng(originalImage));
   }
-
-  return Uint8List.fromList(img.encodePng(originalImage));
-}
-
 }
