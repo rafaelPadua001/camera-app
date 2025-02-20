@@ -422,6 +422,11 @@ class _EditDialogState extends State<EditDialog> {
                           'assets/haircut/image8.jpg',
                           'assets/haircut/image9.png',
                           'assets/haircut/image10.png',
+                          'assets/haircut/image11.png',
+                          'assets/haircut/image12.png',
+                          'assets/haircut/image13.png',
+                          'assets/haircut/image14.png'
+                          
                         ],
                         originalImagePath: widget.image.path,
                         onImageProcessed: (ui.Image? newImage) async {
