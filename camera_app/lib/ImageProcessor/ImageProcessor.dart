@@ -40,19 +40,15 @@ class ImageProcessor {
 
     // Redimensionar máscara
     final resizedMask = _resizeMaskToImageSize(
-        hairMask, maskDimension, originalImage.width, originalImage.height);
-    final blurredMask = _blurMask(resizedMask, 100);
-
+    hairMask, originalImage.width, originalImage.height);
+    final blurredMask = _blurMask(resizedMask, 6);
 
     // Aplicar máscara de cabelo
     final processedImage = _applyHairMask(
       originalImage,
       hairImageBytes,
-      hairMask: hairMask,
-      maskMargin: 0, // Ajustável
+      hairMask: blurredMask,
     );
-
-   
 
     // Fechar o modelo
     await tensorFlowHelper.closeModel();
@@ -65,19 +61,34 @@ class ImageProcessor {
   }
 
   img.Image _resizeMaskToImageSize(
-      List<int> mask, int maskDimension, int targetWidth, int targetHeight) {
-    final maskImage = img.Image(width: maskDimension, height: maskDimension);
-    for (int y = 0; y < maskDimension; y++) {
-      for (int x = 0; x < maskDimension; x++) {
-        final index = y * maskDimension + x;
-        final value = mask[index] == 1 ? 255 : 0;
-        maskImage.setPixelRgb(x, y, value, value, value);
-      }
-    }
+    List<int> mask, int targetWidth, int targetHeight) {
+  // Criar imagem sem canal alfa para evitar transparência
+  final maskImage = img.Image(
+    width: maskDimension,
+    height: maskDimension,
+    numChannels: 3, // Apenas RGB (sem transparência)
+  );
 
-    // Redimensiona a máscara para o tamanho da imagem original
-    return img.copyResize(maskImage, width: targetWidth, height: targetHeight);
+  // Preencher a imagem com os valores binários (preto e branco)
+  for (int y = 0; y < maskDimension; y++) {
+    for (int x = 0; x < maskDimension; x++) {
+      final index = y * maskDimension + x;
+      final value = mask[index] == 1 ? 255 : 0; // 1 = branco, 0 = preto
+      maskImage.setPixelRgb(x, y, value, value, value); // RGB para branco ou preto
+    }
   }
+
+  // Redimensionar a máscara para o tamanho da imagem original
+  final resizedMaskImage = img.copyResize(
+    maskImage,
+    width: targetWidth, // Usa as dimensões da imagem original
+    height: targetHeight,
+    interpolation: img.Interpolation.nearest, // Para garantir a binarização
+  );
+
+  return resizedMaskImage;
+}
+
 
   Future<Uint8List> _loadImageBytes(String path) async {
     if (path.startsWith('assets/')) {
@@ -89,71 +100,40 @@ class ImageProcessor {
     }
   }
 
- 
-
-  Uint8List _applyHairMask(
-  img.Image originalImage,
-  Uint8List hairImageBytes, {
-  required List<int> hairMask,
-  int maskMargin = 0,
-  double scale = 0.8,
-}) {
+ Uint8List _applyHairMask(img.Image originalImage, Uint8List hairImageBytes,
+    {required img.Image hairMask}) {
   final hairImage = img.decodeImage(hairImageBytes);
   if (hairImage == null) {
     throw Exception("Erro ao decodificar a imagem de cabelo.");
   }
 
-  final newWidth = (originalImage.width * scale).toInt();
-  final newHeight = (originalImage.height * scale).toInt();
+  // Redimensiona a imagem de cabelo para se ajustar ao tamanho da imagem original
   final resizedHairImage = img.copyResize(
     hairImage,
-    width: newWidth,
-    height: newHeight,
-    interpolation: img.Interpolation.linear,
+    width: originalImage.width,
+    height: originalImage.height,
   );
 
-  final offsetX = (originalImage.width - newWidth) ~/ 2;
-  final offsetY = (originalImage.height - newHeight) ~/ 2;
+  // Aplicar a máscara na imagem original pixel por pixel
+  for (int y = 0; y < originalImage.height; y++) {
+    for (int x = 0; x < originalImage.width; x++) {
+      final maskPixel = hairMask.getPixel(x, y).luminance;
 
-  for (int y = 0; y < newHeight; y++) {
-    for (int x = 0; x < newWidth; x++) {
-      final targetX = x + offsetX;
-      final targetY = y + offsetY;
-
-      if (targetX < 0 || targetX >= originalImage.width || targetY < 0 || targetY >= originalImage.height) {
-        continue;
-      }
-
-      final maskX = (targetX * 256) ~/ originalImage.width;
-      final maskY = (targetY * 256) ~/ originalImage.height;
-
-      if (_isWithinMask(hairMask, maskX, maskY, 256, maskMargin)) {
+      if (maskPixel > 128) { // Se a máscara for "ativa" (branca)
+        // Apenas aplica a cor se a máscara estiver ativa
         final hairPixel = resizedHairImage.getPixel(x, y);
+        final originalPixel = originalImage.getPixel(x, y);
 
-        // Acessando os componentes de cor diretamente
-        final hairAlpha = hairPixel.a;
-        final hairRed = hairPixel.r;
-        final hairGreen = hairPixel.g;
-        final hairBlue = hairPixel.b;
+        // Aplicação do blendedPixel para mistura mais suave
+        final factor = 0.9;
+        final blendedPixel = img.ColorRgba8(
+          ((hairPixel.r * factor) + (originalPixel.r * (1 - factor))).toInt(),
+          ((hairPixel.g * factor) + (originalPixel.g * (1 - factor))).toInt(),
+          ((hairPixel.b * factor) + (originalPixel.b * (1 - factor))).toInt(),
+          255,
+        );
 
-        if (hairAlpha > 0) {
-          final bgPixel = originalImage.getPixel(targetX, targetY);
-
-          final bgRed = bgPixel.r;
-          final bgGreen = bgPixel.g;
-          final bgBlue = bgPixel.b;
-
-          // Aplicando a transparência correta
-          final alphaFactor = hairAlpha / 255.0;
-          final blendedRed = ((hairRed * alphaFactor) + (bgRed * (1 - alphaFactor))).toInt();
-          final blendedGreen = ((hairGreen * alphaFactor) + (bgGreen * (1 - alphaFactor))).toInt();
-          final blendedBlue = ((hairBlue * alphaFactor) + (bgBlue * (1 - alphaFactor))).toInt();
-
-          // Criando o pixel misturado
-          final blendedPixel = img.ColorRgba8(blendedRed, blendedGreen, blendedBlue, 255);
-
-          originalImage.setPixel(targetX, targetY, blendedPixel);
-        }
+        originalImage.setPixel(x, y, blendedPixel);
       }
     }
   }
@@ -161,27 +141,4 @@ class ImageProcessor {
   return Uint8List.fromList(img.encodePng(originalImage));
 }
 
-  bool _isWithinMask(
-    List<int> hairMask,
-    int maskX,
-    int maskY,
-    int maskDimension,
-    int maskMargin,
-  ) {
-    for (int i = -maskMargin; i <= maskMargin; i++) {
-      for (int j = -maskMargin; j <= maskMargin; j++) {
-        final marginX = maskX + i;
-        final marginY = maskY + j;
-
-        if (marginX >= 0 &&
-            marginX < maskDimension &&
-            marginY >= 0 &&
-            marginY < maskDimension &&
-            hairMask[marginY * maskDimension + marginX] == 1) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
 }
