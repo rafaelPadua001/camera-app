@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
-import 'package:path_provider/path_provider.dart';
+import 'dart:math';
 import '/helpers/TensorFlowHelper.dart';
 
 class ImageProcessor {
@@ -39,8 +39,9 @@ class ImageProcessor {
     }
 
     // Redimensionar máscara
-    final resizedMask = _resizeMaskToImageSize(hairMask, originalImage.width, originalImage.height);
-    final blurredMask = _blurMask(resizedMask, 2);
+    final resizedMask = _resizeMaskToImageSize(
+        hairMask, originalImage.width, originalImage.height);
+    final blurredMask = _blurEdgesOnly(resizedMask, 6);
 
     // Aplicar máscara de cabelo com melhorias no encaixe
     final processedImage = _applyHairMask(
@@ -55,11 +56,26 @@ class ImageProcessor {
     return processedImage;
   }
 
-  img.Image _blurMask(img.Image maskImage, int intensity) {
-    return img.gaussianBlur(maskImage, radius: intensity);
+img.Image _blurEdgesOnly(img.Image maskImage, int blurRadius) {
+  final maskCopy = img.Image.from(maskImage); // Cópia da máscara original
+  final blurred = img.gaussianBlur(maskImage, radius: blurRadius);
+
+  for (int y = 0; y < maskImage.height; y++) {
+    for (int x = 0; x < maskImage.width; x++) {
+      final originalPixel = maskCopy.getPixel(x, y).luminance;
+      if (originalPixel == 255) {
+        maskImage.setPixelRgb(x, y, 255, 255, 255); // Mantém centro intacto
+      } else {
+        maskImage.setPixelRgb(x, y, blurred.getPixel(x, y).luminance, blurred.getPixel(x, y).luminance, blurred.getPixel(x, y).luminance);
+      }
+    }
   }
 
-  img.Image _resizeMaskToImageSize(List<int> mask, int targetWidth, int targetHeight) {
+  return maskImage;
+}
+
+  img.Image _resizeMaskToImageSize(
+      List<int> mask, int targetWidth, int targetHeight) {
     final maskImage = img.Image(
       width: maskDimension,
       height: maskDimension,
@@ -69,7 +85,7 @@ class ImageProcessor {
     for (int y = 0; y < maskDimension; y++) {
       for (int x = 0; x < maskDimension; x++) {
         final index = y * maskDimension + x;
-        final value = mask[index] == 1 ? 255 : 0; 
+        final value = mask[index] == 1 ? 255 : 0;
         maskImage.setPixelRgb(x, y, value, value, value);
       }
     }
@@ -102,18 +118,19 @@ class ImageProcessor {
     // Ajuste do tamanho do cabelo para encaixe melhorado
     final resizedHair = img.copyResize(
       hairImage,
-      width: (originalImage.width * 0.85).toInt(), // 85% da largura original
+      width: (originalImage.width * 0.95).toInt(), // 85% da largura original
       height: (originalImage.height * 0.55).toInt(), // 55% da altura original
-      interpolation: img.Interpolation.cubic,
+      interpolation: img.Interpolation.nearest,
     );
 
     // Ajuste de posição do cabelo na imagem original
-    final offsetY = (originalImage.height * 0.10).toInt(); // Move o cabelo para cima
+    final offsetY =
+        (originalImage.height * 0.10).toInt(); // Move o cabelo para cima
 
     // Criar uma imagem vazia para alinhar o cabelo corretamente
     final alignedImage = img.Image.from(originalImage);
-    img.fill(alignedImage, color: img.ColorRgba8(0, 0, 0, 0)); // Fundo transparente
-
+    img.fill(alignedImage,
+        color: img.ColorRgba8(0, 0, 0, 0)); // Fundo transparente
 
     // Coloca o cabelo na posição ajustada
     img.compositeImage(alignedImage, resizedHair, dstX: 0, dstY: offsetY);
@@ -123,11 +140,12 @@ class ImageProcessor {
       for (int x = 0; x < originalImage.width; x++) {
         final maskPixel = hairMask.getPixel(x, y).luminance;
 
-        if (maskPixel > 128) { // Se a máscara for "ativa" (branca)
+        if (maskPixel > 128) {
+          // Se a máscara for "ativa" (branca)
           final hairPixel = alignedImage.getPixel(x, y);
           final originalPixel = originalImage.getPixel(x, y);
 
-          final factor = 0.85; // Mistura suave do cabelo com a imagem original
+          final factor = 0.9; // Mistura suave do cabelo com a imagem original
           final blendedPixel = img.ColorRgba8(
             ((hairPixel.r * factor) + (originalPixel.r * (1 - factor))).toInt(),
             ((hairPixel.g * factor) + (originalPixel.g * (1 - factor))).toInt(),
