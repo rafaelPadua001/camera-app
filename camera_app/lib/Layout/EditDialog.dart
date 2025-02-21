@@ -425,7 +425,10 @@ class _EditDialogState extends State<EditDialog> {
                           'assets/haircut/image11.png',
                           'assets/haircut/image12.png',
                           'assets/haircut/image13.png',
-                          'assets/haircut/image14.png'
+                          'assets/haircut/image14.png',
+                          'assets/haircut/image15.png',
+                          'assets/haircut/image16.png',
+                          'assets/haircut/image17.png'
                           
                         ],
                         originalImagePath: widget.image.path,
