@@ -4,8 +4,10 @@ import 'Camera.dart';
 import 'Layout/BottomBar.dart';
 import 'Galery.dart'; // Importa a página da galeria ou outras páginas que você tem
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-void main() {
+void main() async {
+  await dotenv.load(fileName: ".env");
   WidgetsFlutterBinding.ensureInitialized();
   MobileAds.instance.initialize();
   runApp(const MyApp());
@@ -47,7 +49,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   InterstitialAd? _interstitialAd;
 
-  final String adUnitId = 'ca-app-pub-3940256099942544/1033173712'; 
+  String adBannerId = dotenv.env['ADMOB_BANNER_ID'] ?? "";
+  String adIntersticialId  = dotenv.env['ADMOB_INTERSTICIAL_ID'] ?? "";
+
+  //Credentials to test
+  //final String adUnitId = 'ca-app-pub-3940256099942544/1033173712'; 
 
   // Lista de widgets das páginas
   final List<Widget> _pages = [
@@ -66,12 +72,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _loadBannerAd() {
     _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-3940256099942544/6300978111',
+      adUnitId: adBannerId,
+    //  adUnitId: 'ca-app-pub-3940256099942544/6300978111',
       size: AdSize.banner,
       request: AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (Ad ad) {
-          print('Ad loaded: ${ad.adUnitId}');
           setState(() {
             _isBannerAdLoaded = true;
           });
@@ -87,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   void _loadInterstitialAd() {
     InterstitialAd.load(
-      adUnitId: adUnitId,
+      adUnitId: adIntersticialId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (InterstitialAd ad) {
