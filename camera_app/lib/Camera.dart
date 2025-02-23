@@ -17,8 +17,6 @@ class Camera extends StatelessWidget {
   void _requestCameraPermission(BuildContext context) async {
     PermissionStatus status = await Permission.camera.request();
     if (status.isGranted) {
-      print('Permissão de camera concedida !');
-
       final ImagePicker _picker = ImagePicker();
       final XFile? image = await _picker.pickImage(source: ImageSource.camera);
        // Voltar para a galeria e recarregar as imagens
